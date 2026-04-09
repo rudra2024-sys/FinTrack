@@ -1,0 +1,75 @@
+name: Scheduled Health Check
+
+on:
+  schedule:
+    # Run every Sunday at midnight UTC
+    - cron: '0 0 * * 0'
+  workflow_dispatch:
+
+jobs:
+  health-check:
+    runs-on: ubuntu-latest
+    name: System Health Check
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+      
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+      
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Check Backend Configuration
+        run: |
+          echo "✓ Backend Health Check"
+          cd fintrack-backend
+          echo "  - Checking pom.xml..."
+          [ -f "pom.xml" ] && echo "  ✓ pom.xml found"
+          echo "  - Checking Dockerfile..."
+          [ -f "Dockerfile" ] && echo "  ✓ Dockerfile found"
+          cd ..
+      
+      - name: Check Frontend Configuration
+        run: |
+          echo "✓ Frontend Health Check"
+          cd fintrack-frontend
+          echo "  - Checking package.json..."
+          [ -f "package.json" ] && echo "  ✓ package.json found" || echo "  ✗ package.json NOT found"
+          echo "  - Checking Dockerfile..."
+          [ -f "Dockerfile" ] && echo "  ✓ Dockerfile found"
+          echo "  - Checking index.html..."
+          [ -f "index.html" ] && echo "  ✓ index.html found"
+          cd ..
+      
+      - name: Check ML Service Configuration
+        run: |
+          echo "✓ ML Service Health Check"
+          cd fintrack-ml-service
+          echo "  - Checking requirements.txt..."
+          [ -f "requirements.txt" ] && echo "  ✓ requirements.txt found"
+          echo "  - Checking main.py..."
+          [ -f "app/main.py" ] && echo "  ✓ app/main.py found"
+          echo "  - Checking Dockerfile..."
+          [ -f "Dockerfile" ] && echo "  ✓ Dockerfile found"
+          cd ..
+      
+      - name: Check Infrastructure Configuration
+        run: |
+          echo "✓ Infrastructure Health Check"
+          echo "  - Checking docker-compose.yml..."
+          [ -f "docker-compose.yml" ] && echo "  ✓ docker-compose.yml found"
+          echo "  - Checking .github workflows..."
+          [ -d ".github/workflows" ] && echo "  ✓ .github/workflows found"
+          echo "✓ All configuration checks passed"

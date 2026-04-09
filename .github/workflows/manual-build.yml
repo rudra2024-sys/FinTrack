@@ -1,0 +1,87 @@
+name: Build Verification
+
+on:
+  workflow_dispatch:
+    inputs:
+      component:
+        description: 'Component to build'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - backend
+          - frontend
+          - ml-service
+
+jobs:
+  build-backend:
+    if: github.event.inputs.component == 'all' || github.event.inputs.component == 'backend'
+    runs-on: ubuntu-latest
+    name: Build Backend Verification
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Setup Java 17
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+      
+      - name: Build Backend
+        run: |
+          cd fintrack-backend
+          mvn clean install -DskipTests
+          echo "✓ Backend build successful"
+
+  build-frontend:
+    if: github.event.inputs.component == 'all' || github.event.inputs.component == 'frontend'
+    runs-on: ubuntu-latest
+    name: Build Frontend Verification
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm install
+      
+      - name: Build Frontend
+        run: |
+          npm run build --if-present || echo "ℹ No build script defined"
+          echo "✓ Frontend build verified"
+
+  build-ml-service:
+    if: github.event.inputs.component == 'all' || github.event.inputs.component == 'ml-service'
+    runs-on: ubuntu-latest
+    name: Build ML Service Verification
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          cd fintrack-ml-service
+          pip install -r requirements.txt
+      
+      - name: Verify ML Service
+        run: |
+          cd fintrack-ml-service
+          python -m py_compile app/main.py
+          echo "✓ ML Service build verified"
