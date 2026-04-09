@@ -1,0 +1,3635 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>FINTRACK</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,300;0,400;0,600;0,700;0,900;1,700&family=Barlow:wght@300;400;500&family=IBM+Plex+Mono:wght@300;400;500&display=swap" rel="stylesheet"/>
+
+<style>
+:root {
+  --bg:       #0a0a08;
+  --surface:  #0f0f0c;
+  --card:     #131310;
+  --line:     rgba(255,255,255,0.07);
+  --line2:    rgba(255,255,255,0.04);
+  --acid:     #c8f000;
+  --ember:    #ff4d00;
+  --ice:      #00e5ff;
+  --offwhite: #e8e4dc;
+  --muted:    #5a5a52;
+  --dim:      #2a2a26;
+  --font-display: 'Barlow Condensed', sans-serif;
+  --font-body:    'Barlow', sans-serif;
+  --font-mono:    'IBM Plex Mono', monospace;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--offwhite);
+  font-family: var(--font-body);
+  overflow-x: hidden;
+  cursor: none;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ‚??‚?? GRAIN ‚??‚?? */
+body::before {
+  content: '';
+  position: fixed; inset: 0; z-index: 8000;
+  pointer-events: none; opacity: 0.028;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 600 600' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 200px;
+}
+
+/* ‚??‚?? CURSOR ‚??‚?? */
+#cursor {
+  position: fixed; z-index: 9999; pointer-events: none;
+  width: 8px; height: 8px;
+  background: var(--acid);
+  border-radius: 0;
+  transform-origin: center;
+  mix-blend-mode: difference;
+  transition: width 0.2s, height 0.2s;
+}
+#cursor-outer {
+  position: fixed; z-index: 9998; pointer-events: none;
+  width: 32px; height: 32px;
+  border: 1px solid rgba(200,240,0,0.3);
+  border-radius: 0;
+  transition: transform 0.14s ease;
+}
+body:has(a:hover) #cursor,
+body:has(.clickable:hover) #cursor { width: 14px; height: 14px; }
+
+/* ‚??‚?? SCROLLBAR ‚??‚?? */
+::-webkit-scrollbar { width: 2px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--dim); }
+
+/* ‚??‚?? SELECTION ‚??‚?? */
+::selection { background: var(--acid); color: #000; }
+
+/* ‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê
+   LAYOUT
+‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê */
+#shell { display: flex; min-height: 100vh; }
+
+/* ‚??‚?? SIDEBAR ‚??‚?? */
+#sidebar {
+  width: 60px;
+  border-right: 1px solid var(--line);
+  display: flex; flex-direction: column; align-items: center;
+  padding: 24px 0; gap: 6px;
+  position: fixed; left: 0; top: 0; bottom: 0; z-index: 200;
+  background: var(--bg);
+}
+.logo-vert {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  transform: rotate(180deg);
+  font-family: var(--font-display);
+  font-size: 13px; font-weight: 700;
+  letter-spacing: 0.3em;
+  color: var(--offwhite);
+  margin-bottom: 28px;
+  text-transform: uppercase;
+}
+.logo-vert span { color: var(--acid); }
+
+.nav-icon {
+  width: 36px; height: 36px;
+  display: flex; align-items: center; justify-content: center;
+  border: 1px solid transparent;
+  cursor: pointer; color: var(--muted);
+  transition: color 0.15s, border-color 0.15s;
+  position: relative;
+}
+.nav-icon:hover, .nav-icon.active { color: var(--offwhite); border-color: var(--line); }
+.nav-icon.active::after {
+  content: '';
+  position: absolute; left: -1px;
+  width: 2px; height: 16px;
+  background: var(--acid);
+}
+.nav-icon svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.5; }
+
+/* ‚??‚?? MAIN ‚??‚?? */
+#main { margin-left: 60px; flex: 1; min-width: 0; }
+
+/* ‚??‚?? TOPBAR ‚??‚?? */
+#topbar {
+  height: 56px;
+  border-bottom: 1px solid var(--line);
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 40px;
+  position: sticky; top: 0; z-index: 100;
+  background: rgba(10,10,8,0.95);
+  backdrop-filter: blur(20px);
+}
+.tb-left {
+  display: flex; align-items: center; gap: 32px;
+}
+.tb-label {
+  font-family: var(--font-mono);
+  font-size: 9px; letter-spacing: 0.2em;
+  color: var(--muted); text-transform: uppercase;
+}
+.tb-sep { width: 1px; height: 18px; background: var(--line); }
+
+.tb-nav { display: flex; gap: 0; }
+.tn {
+  font-family: var(--font-mono);
+  font-size: 9px; letter-spacing: 0.15em; text-transform: uppercase;
+  padding: 6px 16px; cursor: pointer; color: var(--muted);
+  border: 1px solid transparent; border-radius: 0;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  position: relative;
+}
+.tn.on {
+  color: var(--acid);
+  border-color: rgba(200,240,0,0.2);
+  background: rgba(200,240,0,0.04);
+}
+.tn:hover:not(.on) { color: var(--offwhite); }
+
+.tb-right { display: flex; align-items: center; gap: 20px; }
+.live-ind {
+  display: flex; align-items: center; gap: 7px;
+  font-family: var(--font-mono); font-size: 9px;
+  letter-spacing: 0.2em; color: var(--muted);
+  text-transform: uppercase;
+}
+.pulse {
+  width: 5px; height: 5px; border-radius: 50%;
+  background: var(--acid);
+  box-shadow: 0 0 8px var(--acid);
+  animation: pulse 2s ease-in-out infinite;
+}
+@keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.3;} }
+.clock {
+  font-family: var(--font-mono); font-size: 12px;
+  color: var(--dim); letter-spacing: 0.1em;
+}
+.user-chip {
+  display: flex; align-items: center; gap: 10px;
+  border: 1px solid var(--line);
+  padding: 5px 12px; cursor: pointer;
+  transition: border-color 0.15s;
+}
+.user-chip:hover { border-color: var(--dim); }
+.user-chip span {
+  font-family: var(--font-mono); font-size: 9px;
+  letter-spacing: 0.15em; color: var(--muted); text-transform: uppercase;
+}
+.user-dot {
+  width: 20px; height: 20px;
+  background: var(--dim);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-display); font-size: 11px;
+  color: var(--acid); font-weight: 700;
+}
+
+/* AUTH */
+.auth-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 4000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background:
+    radial-gradient(circle at top, rgba(200,240,0,0.08), transparent 32%),
+    rgba(10,10,8,0.82);
+  backdrop-filter: blur(20px);
+}
+.auth-modal[hidden] { display: none; }
+.auth-card {
+  width: min(100%, 440px);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)),
+    var(--surface);
+  border: 1px solid var(--line);
+  box-shadow:
+    0 30px 90px rgba(0,0,0,0.45),
+    0 0 0 1px rgba(200,240,0,0.05);
+}
+.auth-head {
+  padding: 28px 28px 18px;
+  border-bottom: 1px solid var(--line);
+}
+.auth-kicker {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 12px;
+}
+.auth-title {
+  font-family: var(--font-display);
+  font-size: 38px;
+  line-height: 0.95;
+  letter-spacing: -0.03em;
+  text-transform: uppercase;
+}
+.auth-subtitle {
+  margin-top: 12px;
+  color: #a6a397;
+  font-size: 13px;
+  line-height: 1.7;
+}
+.auth-body {
+  padding: 24px 28px 28px;
+}
+.auth-toggle {
+  display: inline-grid;
+  grid-template-columns: 1fr 1fr;
+  width: 100%;
+  border: 1px solid var(--line);
+  margin-bottom: 18px;
+}
+.auth-tab {
+  background: transparent;
+  border: 0;
+  color: var(--muted);
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  padding: 12px 14px;
+  text-transform: uppercase;
+  transition: background 0.18s ease, color 0.18s ease;
+}
+.auth-tab.active {
+  color: #050505;
+  background: var(--acid);
+}
+.auth-form {
+  display: grid;
+  gap: 14px;
+}
+.auth-field {
+  display: grid;
+  gap: 8px;
+}
+.auth-field label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--muted);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+.auth-input {
+  width: 100%;
+  border: 1px solid var(--line);
+  background: rgba(255,255,255,0.02);
+  color: var(--offwhite);
+  padding: 14px 16px;
+  font: inherit;
+  transition: border-color 0.18s ease, transform 0.18s ease;
+}
+.auth-input:focus-visible {
+  outline: none;
+  border-color: rgba(200,240,0,0.4);
+  transform: translateY(-1px);
+}
+.auth-field.optional[hidden] { display: none; }
+.auth-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 6px;
+}
+.auth-btn {
+  flex: 1;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--offwhite);
+  cursor: pointer;
+  padding: 14px 16px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  transition: transform 0.18s ease, opacity 0.18s ease, background 0.18s ease, border-color 0.18s ease;
+}
+.auth-btn:hover,
+.auth-btn:focus-visible {
+  outline: none;
+  transform: translateY(-1px);
+  border-color: rgba(200,240,0,0.28);
+}
+.auth-btn:active { transform: translateY(1px); }
+.auth-btn.primary {
+  background: var(--acid);
+  border-color: rgba(200,240,0,0.24);
+  color: #050505;
+}
+.auth-btn.secondary {
+  color: var(--muted);
+}
+.auth-note,
+.auth-error {
+  min-height: 18px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+}
+.auth-note { color: var(--muted); margin-bottom: 8px; }
+.auth-error { color: #ff8b57; margin-top: 2px; }
+.auth-card.is-authenticated .auth-form,
+.auth-card.is-authenticated .auth-toggle { display: none; }
+.auth-session {
+  display: none;
+  gap: 12px;
+}
+.auth-card.is-authenticated .auth-session {
+  display: grid;
+}
+.auth-session-box {
+  border: 1px solid var(--line);
+  padding: 16px;
+  background: rgba(255,255,255,0.015);
+}
+.auth-session-label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  color: var(--muted);
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.auth-session-name {
+  font-family: var(--font-display);
+  font-size: 24px;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  text-transform: uppercase;
+}
+.auth-session-meta {
+  margin-top: 8px;
+  color: #a6a397;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* ‚??‚?? CONTENT ‚??‚?? */
+#content { padding: 0 40px 60px; }
+
+/* ‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê
+   HERO SECTION
+‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê */
+.hero-section {
+  padding: 48px 0 0;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 0;
+}
+.hero-meta {
+  display: flex; align-items: center; gap: 20px;
+  font-family: var(--font-mono); font-size: 9px;
+  letter-spacing: 0.2em; color: var(--muted); text-transform: uppercase;
+  margin-bottom: 16px;
+}
+.hero-meta::before {
+  content: ''; width: 28px; height: 1px; background: var(--acid);
+}
+.hero-meta-sep { color: var(--dim); }
+
+.hero-numblock {
+  display: flex; align-items: flex-end; gap: 0;
+  margin-bottom: 24px;
+}
+.hero-currency {
+  font-family: var(--font-display);
+  font-size: clamp(32px, 5vw, 52px);
+  font-weight: 300; color: var(--muted);
+  line-height: 1; margin-bottom: 14px; margin-right: 8px;
+  letter-spacing: 0.02em;
+}
+.hero-number {
+  font-family: var(--font-display);
+  font-size: clamp(80px, 14vw, 160px);
+  font-weight: 900; line-height: 0.85;
+  letter-spacing: -0.02em;
+  color: var(--offwhite);
+}
+.hero-number .frac {
+  font-size: 0.35em; color: var(--muted); font-weight: 300;
+}
+.hero-badge {
+  margin-left: 28px; margin-bottom: 18px;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.badge-delta {
+  font-family: var(--font-mono); font-size: 11px;
+  color: var(--acid); letter-spacing: 0.05em;
+  border: 1px solid rgba(200,240,0,0.2);
+  padding: 4px 10px; display: inline-block;
+  background: rgba(200,240,0,0.04);
+}
+.badge-label {
+  font-family: var(--font-mono); font-size: 9px;
+  color: var(--muted); letter-spacing: 0.15em; text-transform: uppercase;
+}
+
+.hero-stats-row {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  border-top: 1px solid var(--line);
+}
+.hs-item {
+  padding: 20px 0 24px;
+  border-right: 1px solid var(--line);
+  position: relative;
+}
+.hs-item:last-child { border-right: none; }
+.hs-item + .hs-item { padding-left: 32px; }
+.hs-label {
+  font-family: var(--font-mono); font-size: 9px;
+  letter-spacing: 0.2em; color: var(--muted);
+  text-transform: uppercase; margin-bottom: 8px;
+  display: flex; align-items: center; gap: 10px;
+}
+.hs-label::before { content: '‚??'; color: var(--dim); font-size: 10px; }
+.hs-value {
+  font-family: var(--font-display);
+  font-size: clamp(28px, 3.5vw, 44px);
+  font-weight: 700; letter-spacing: -0.01em;
+  line-height: 1;
+}
+.hs-delta {
+  font-family: var(--font-mono); font-size: 10px;
+  margin-top: 6px; letter-spacing: 0.05em;
+}
+.up { color: var(--acid); }
+.dn { color: var(--ember); }
+
+/* ‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê
+   TICKER
+‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê */
+.ticker-wrap {
+  border-bottom: 1px solid var(--line);
+  overflow: hidden; position: relative;
+  background: var(--surface);
+}
+.ticker-wrap::before, .ticker-wrap::after {
+  content: ''; position: absolute; top: 0; bottom: 0; width: 60px; z-index: 2; pointer-events: none;
+}
+.ticker-wrap::before { left: 0; background: linear-gradient(90deg, var(--surface), transparent); }
+.ticker-wrap::after  { right: 0; background: linear-gradient(-90deg, var(--surface), transparent); }
+.ticker-track {
+  display: flex; gap: 0; white-space: nowrap;
+  animation: ticker 36s linear infinite;
+  padding: 10px 0;
+}
+.ticker-track:hover { animation-play-state: paused; }
+@keyframes ticker { from{transform:translateX(0)} to{transform:translateX(-50%)} }
+.tick {
+  display: inline-flex; align-items: center; gap: 12px;
+  padding: 0 40px;
+  border-right: 1px solid var(--line);
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.08em;
+}
+.tick-name {
+  font-family: var(--font-display);
+  font-size: 13px; font-weight: 700;
+  color: var(--offwhite); letter-spacing: 0.08em; text-transform: uppercase;
+}
+.tick-val { color: var(--muted); }
+
+/* ‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê
+   TWO-COL GRID
+‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê */
+.grid-2 {
+  display: grid; grid-template-columns: 1fr 380px;
+  border-bottom: 1px solid var(--line);
+}
+.grid-3 {
+  display: grid; grid-template-columns: 1fr 1fr 1fr;
+}
+.grid-2-equal {
+  display: grid; grid-template-columns: 1fr 1fr;
+}
+
+/* ‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê
+   PANEL (replaces .card)
+‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê */
+.panel {
+  padding: 32px;
+  position: relative;
+  border-right: 1px solid var(--line);
+  transition: background 0.2s;
+}
+.panel:last-child { border-right: none; }
+.panel-bottom { border-top: 1px solid var(--line); }
+
+.panel-eyebrow {
+  font-family: var(--font-mono); font-size: 9px;
+  letter-spacing: 0.25em; color: var(--muted);
+  text-transform: uppercase; margin-bottom: 20px;
+  display: flex; align-items: center; gap: 14px;
+}
+.panel-eyebrow::after { content: ''; flex: 1; height: 1px; background: var(--line); }
+
+.panel-title {
+  font-family: var(--font-display);
+  font-size: 22px; font-weight: 700;
+  letter-spacing: 0.02em; text-transform: uppercase;
+  color: var(--offwhite); margin-bottom: 24px;
+}
+
+/* ‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê
+   CHART
+‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê */
+.chart-container { position: relative; height: 220px; }
+#chartSvg { width: 100%; height: 100%; overflow: visible; }
+
+.chart-legend {
+  display: flex; gap: 24px; margin-bottom: 20px;
+}
+.leg { display: flex; align-items: center; gap: 8px;
+  font-family: var(--font-mono); font-size: 9px;
+  color: var(--muted); letter-spacing: 0.12em; text-transform: uppercase;
+}
+.leg-line { width: 20px; height: 1px; }
+
+/* ‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê
+   DONUT
+‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê */
+.donut-wrap {
+  display: flex; align-items: center; gap: 32px;
+  margin-top: 8px;
+}
+.donut-center-text {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+}
+.donut-big {
+  font-family: var(--font-display);
+  font-size: 22px; font-weight: 700; line-height: 1;
+}
+.donut-sub {
+  font-family: var(--font-mono); font-size: 8px;
+  color: var(--muted); letter-spacing: 0.15em;
+  text-transform: uppercase; margin-top: 3px;
+}
+.donut-legend { flex: 1; display: flex; flex-direction: column; gap: 10px; }
+.dl-item { display: flex; align-items: center; justify-content: space-between; }
+.dl-left { display: flex; align-items: center; gap: 8px;
+  font-family: var(--font-mono); font-size: 10px; color: var(--muted); }
+.dl-dot { width: 6px; height: 6px; flex-shrink: 0; }
+.dl-val {
+  font-family: var(--font-display);
+  font-size: 15px; font-weight: 700;
+  color: var(--offwhite);
+}
+
+/* ‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê
+   TRANSACTIONS
+‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê */
+.tx-header {
+  display: grid; grid-template-columns: 1fr 80px 90px;
+  padding: 0 0 10px;
+  border-bottom: 1px solid var(--line2);
+  font-family: var(--font-mono); font-size: 8px;
+  letter-spacing: 0.2em; color: var(--muted); text-transform: uppercase;
+}
+.tx-row {
+  display: grid; grid-template-columns: 1fr 80px 90px;
+  padding: 13px 0;
+  border-bottom: 1px solid var(--line2);
+  align-items: center;
+  cursor: pointer;
+  transition: padding-left 0.2s;
+}
+.tx-row:hover { padding-left: 8px; background: rgba(255,255,255,0.01); }
+.tx-name {
+  font-family: var(--font-display);
+  font-size: 15px; font-weight: 600;
+  letter-spacing: 0.04em; text-transform: uppercase;
+  color: var(--offwhite);
+}
+.tx-cat {
+  font-family: var(--font-mono); font-size: 9px;
+  color: var(--muted); letter-spacing: 0.1em;
+  margin-top: 2px; text-transform: uppercase;
+}
+.tx-date {
+  font-family: var(--font-mono); font-size: 9px;
+  color: var(--muted); letter-spacing: 0.08em;
+}
+.tx-amount {
+  font-family: var(--font-display);
+  font-size: 16px; font-weight: 700;
+  letter-spacing: 0.02em; text-align: right;
+}
+
+/* ‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê
+   BUDGETS
+‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê */
+.bud-row { padding: 16px 0; border-bottom: 1px solid var(--line2); }
+.bud-row:last-child { border-bottom: none; }
+.bud-meta {
+  display: flex; justify-content: space-between; align-items: baseline;
+  margin-bottom: 10px;
+}
+.bud-name {
+  font-family: var(--font-display);
+  font-size: 14px; font-weight: 700;
+  letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--offwhite);
+}
+.bud-nums {
+  font-family: var(--font-mono); font-size: 9px;
+  color: var(--muted); letter-spacing: 0.08em;
+}
+.bud-track {
+  height: 2px; background: var(--dim);
+  position: relative; overflow: hidden;
+}
+.bud-fill {
+  height: 100%; width: 0%;
+  transition: width 1.6s cubic-bezier(0.22,1,0.36,1);
+  position: relative;
+}
+/* Shimmer */
+.bud-fill::after {
+  content: '';
+  position: absolute; top: 0; left: -80%; width: 80%; height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.6), transparent);
+  animation: shim 3s ease-in-out infinite;
+  animation-delay: inherit;
+}
+@keyframes shim { 0%{left:-80%} 60%,100%{left:160%} }
+.bud-status {
+  font-family: var(--font-mono); font-size: 9px;
+  margin-top: 6px; letter-spacing: 0.1em; text-transform: uppercase;
+}
+
+/* ‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê
+   GOALS
+‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê */
+.goal-row {
+  display: flex; align-items: center; gap: 20px;
+  padding: 16px 0; border-bottom: 1px solid var(--line2);
+  cursor: pointer;
+  transition: padding-left 0.2s;
+}
+.goal-row:last-child { border-bottom: none; }
+.goal-row:hover { padding-left: 6px; }
+.goal-index {
+  font-family: var(--font-display);
+  font-size: 36px; font-weight: 900;
+  color: var(--dim); line-height: 1; width: 40px; flex-shrink: 0;
+}
+.goal-body { flex: 1; }
+.goal-name {
+  font-family: var(--font-display);
+  font-size: 14px; font-weight: 700;
+  letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--offwhite); margin-bottom: 8px;
+}
+.goal-bar-track { height: 2px; background: var(--dim); overflow: hidden; }
+.goal-bar-fill { height: 100%; width: 0%; transition: width 1.6s cubic-bezier(0.22,1,0.36,1); }
+.goal-right { text-align: right; }
+.goal-pct {
+  font-family: var(--font-display);
+  font-size: 28px; font-weight: 900;
+  line-height: 1;
+}
+.goal-eta {
+  font-family: var(--font-mono); font-size: 8px;
+  color: var(--muted); letter-spacing: 0.12em; text-transform: uppercase;
+  margin-top: 3px;
+}
+
+/* ‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê
+   INSIGHTS
+‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê */
+.insight-row {
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line2);
+  display: grid; grid-template-columns: 48px 1fr;
+  gap: 12px; align-items: start;
+  cursor: pointer; transition: background 0.15s;
+}
+.insight-row:last-child { border-bottom: none; }
+.insight-row:hover { background: rgba(255,255,255,0.01); }
+.insight-tag {
+  font-family: var(--font-display);
+  font-size: 10px; font-weight: 700;
+  letter-spacing: 0.15em; text-transform: uppercase;
+  padding: 3px 0;
+}
+.insight-text {
+  font-size: 12px; color: var(--muted);
+  line-height: 1.6; letter-spacing: 0.01em;
+}
+.insight-text strong { color: var(--offwhite); font-weight: 500; }
+
+/* ‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê
+   ACCOUNT NODES
+‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê */
+.account-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 0; border-bottom: 1px solid var(--line2);
+}
+.account-row:last-child { border-bottom: none; }
+.acc-left { display: flex; align-items: center; gap: 12px; }
+.acc-dot { width: 6px; height: 6px; flex-shrink: 0; }
+.acc-name {
+  font-family: var(--font-display);
+  font-size: 14px; font-weight: 700;
+  letter-spacing: 0.06em; text-transform: uppercase;
+}
+.acc-type {
+  font-family: var(--font-mono); font-size: 9px;
+  color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase;
+}
+.acc-val {
+  font-family: var(--font-display);
+  font-size: 18px; font-weight: 900;
+  letter-spacing: -0.01em;
+}
+
+/* ‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê
+   REVEAL ANIMATION
+‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê */
+.reveal { opacity: 0; transform: translateY(20px); }
+
+/* ‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê
+   RESPONSIVE
+‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê */
+@media (max-width: 1100px) {
+  .grid-2 { grid-template-columns: 1fr; }
+  .grid-3 { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 720px) {
+  #main { margin-left: 0; }
+  #sidebar { display: none; }
+  #content { padding: 0 20px 40px; }
+  #topbar { padding: 0 20px; }
+  .hero-number { font-size: 72px; }
+  .grid-3 { grid-template-columns: 1fr; }
+  .grid-2-equal { grid-template-columns: 1fr; }
+  .hero-stats-row { grid-template-columns: 1fr 1fr; }
+}
+
+/* ‚??‚?? BRAND NAME ‚??‚?? */
+.brand-name {
+  display: flex; align-items: center; gap: 0;
+  position: relative; overflow: hidden;
+  border: 1px solid var(--line);
+  padding: 5px 14px 5px 12px;
+  cursor: default;
+}
+.brand-name::before {
+  content: '';
+  position: absolute; left: 0; top: 0; bottom: 0;
+  width: 2px;
+  background: var(--acid);
+  box-shadow: 0 0 8px var(--acid), 0 0 20px var(--acid);
+}
+/* scan sweep on brand */
+.brand-name::after {
+  content: '';
+  position: absolute; top: 0; left: -100%; width: 100%; height: 100%;
+  background: linear-gradient(90deg, transparent 0%, rgba(200,240,0,0.06) 50%, transparent 100%);
+  animation: brand-sweep 4s ease-in-out infinite;
+}
+@keyframes brand-sweep {
+  0%   { left: -100%; }
+  40%, 100% { left: 120%; }
+}
+.brand-letters {
+  font-family: var(--font-display);
+  font-size: 15px; font-weight: 900;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--offwhite);
+  position: relative; z-index: 1;
+  animation: brand-chroma 7s ease-in-out infinite;
+}
+.brand-letters .accent { color: var(--acid); }
+@keyframes brand-chroma {
+  0%,85%,100% { text-shadow: none; }
+  87% { text-shadow: 2px 0 var(--ember), -2px 0 var(--ice); letter-spacing: 0.24em; }
+  89% { text-shadow: none; letter-spacing: 0.22em; }
+  91% { text-shadow: -3px 0 var(--ember), 3px 0 var(--acid); }
+  93% { text-shadow: none; }
+}
+.brand-tag {
+  font-family: var(--font-mono);
+  font-size: 7px; letter-spacing: 0.2em;
+  color: var(--muted); text-transform: uppercase;
+  margin-left: 10px; padding-left: 10px;
+  border-left: 1px solid var(--line);
+  line-height: 1;
+  position: relative; z-index: 1;
+}
+.brand-tag span {
+  display: block;
+  color: var(--acid);
+  font-size: 8px; letter-spacing: 0.1em;
+  margin-bottom: 1px;
+}
+/* ‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê
+   PAGE SYSTEM
+‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê */
+.page-hero {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  padding: 40px 0 28px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 0;
+}
+.page-eyebrow {
+  font-family: var(--font-mono); font-size: 9px;
+  letter-spacing: 0.25em; color: var(--muted); text-transform: uppercase;
+  margin-bottom: 8px; display: flex; align-items: center; gap: 14px;
+}
+.page-eyebrow::before { content: '‚??'; color: var(--acid); }
+.page-title {
+  font-family: var(--font-display); font-size: clamp(36px, 5vw, 60px);
+  font-weight: 900; letter-spacing: 0.02em; text-transform: uppercase;
+  line-height: 1; color: var(--offwhite);
+}
+.page-hero-right { display: flex; align-items: center; gap: 16px; padding-bottom: 4px; }
+
+/* ‚??‚?? FILTERS ‚??‚?? */
+.filter-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.ft-select, .ft-input {
+  background: var(--card); border: 1px solid var(--line);
+  color: var(--offwhite); font-family: var(--font-mono);
+  font-size: 10px; letter-spacing: 0.1em;
+  padding: 7px 12px; outline: none;
+  transition: border-color 0.15s;
+  -webkit-appearance: none; border-radius: 0;
+}
+.ft-select:focus, .ft-input:focus { border-color: rgba(200,240,0,0.4); }
+.ft-select option { background: var(--card); }
+.ft-search-wrap { position: relative; }
+.ft-input { width: 220px; }
+.ft-input::placeholder { color: var(--muted); }
+
+/* ‚??‚?? FULL PANEL ‚??‚?? */
+.full-panel {
+  border: 1px solid var(--line); margin-top: 24px;
+  background: var(--card); padding: 28px 32px;
+}
+
+/* ‚??‚?? TX FULL TABLE ‚??‚?? */
+.tx-full-header {
+  display: grid; grid-template-columns: 40px 1fr 140px 140px 100px 120px;
+  padding: 0 0 12px; border-bottom: 1px solid var(--line);
+  font-family: var(--font-mono); font-size: 8px;
+  letter-spacing: 0.2em; color: var(--muted); text-transform: uppercase;
+  gap: 12px;
+}
+.tx-full-row {
+  display: grid; grid-template-columns: 40px 1fr 140px 140px 100px 120px;
+  padding: 14px 0; border-bottom: 1px solid var(--line2);
+  align-items: center; gap: 12px; cursor: pointer;
+  transition: background 0.15s, padding-left 0.15s;
+}
+.tx-full-row:hover { background: rgba(255,255,255,0.015); padding-left: 6px; }
+.tx-row-num { font-family: var(--font-mono); font-size: 9px; color: var(--muted); }
+.tx-full-name { font-family: var(--font-display); font-size: 15px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--offwhite); }
+.tx-full-sub { font-family: var(--font-mono); font-size: 8px; color: var(--muted); letter-spacing: 0.08em; margin-top: 2px; }
+.tx-full-cat, .tx-full-acc { font-family: var(--font-mono); font-size: 9px; color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase; }
+.tx-full-date { font-family: var(--font-mono); font-size: 9px; color: var(--muted); }
+.tx-full-amount { font-family: var(--font-display); font-size: 17px; font-weight: 800; letter-spacing: 0.01em; text-align: right; }
+
+/* ‚??‚?? PAGINATION ‚??‚?? */
+.pagination-row {
+  display: flex; align-items: center; gap: 16px;
+  justify-content: flex-end; padding-top: 20px; margin-top: 4px;
+  border-top: 1px solid var(--line2);
+}
+.pg-btn {
+  font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.2em;
+  border: 1px solid var(--line); background: transparent; color: var(--muted);
+  padding: 6px 16px; cursor: pointer; transition: all 0.15s;
+}
+.pg-btn:hover:not(:disabled) { border-color: var(--acid); color: var(--acid); }
+.pg-btn:disabled { opacity: 0.3; cursor: default; }
+.pg-info { font-family: var(--font-mono); font-size: 9px; color: var(--muted); letter-spacing: 0.1em; }
+
+/* ‚??‚?? STAT STRIP ‚??‚?? */
+.stat-strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0; margin-top: 24px; border: 1px solid var(--line); }
+.stat-strip-lg { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0; border: 1px solid var(--line); margin-top: 0; margin-bottom: 0; }
+.stat-cell {
+  padding: 24px 28px; border-right: 1px solid var(--line);
+  position: relative;
+}
+.stat-cell:last-child { border-right: none; }
+.stat-cell-label { font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.2em; color: var(--muted); text-transform: uppercase; margin-bottom: 10px; }
+.stat-cell-val { font-family: var(--font-display); font-size: 32px; font-weight: 900; letter-spacing: -0.01em; line-height: 1; }
+.stat-cell-delta { font-family: var(--font-mono); font-size: 9px; margin-top: 6px; letter-spacing: 0.05em; }
+
+/* ‚??‚?? BUDGET GRID ‚??‚?? */
+.bud-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 0; padding: 0; }
+.bud-card {
+  padding: 28px 32px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line);
+  position: relative; overflow: hidden;
+}
+.bud-card-name { font-family: var(--font-display); font-size: 20px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 6px; }
+.bud-card-nums { font-family: var(--font-mono); font-size: 9px; color: var(--muted); letter-spacing: 0.1em; margin-bottom: 16px; }
+.bud-card-bar-track { height: 3px; background: var(--dim); overflow: hidden; margin-bottom: 10px; }
+.bud-card-bar-fill { height: 100%; width: 0%; transition: width 1.4s cubic-bezier(0.22,1,0.36,1); }
+.bud-card-footer { display: flex; justify-content: space-between; align-items: baseline; }
+.bud-card-pct { font-family: var(--font-display); font-size: 42px; font-weight: 900; line-height: 1; }
+.bud-card-rem { font-family: var(--font-mono); font-size: 9px; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; text-align: right; }
+.month-label { font-family: var(--font-display); font-size: 28px; font-weight: 900; letter-spacing: 0.08em; color: var(--acid); text-transform: uppercase; }
+.stat-chip { font-family: var(--font-display); font-size: 20px; font-weight: 700; color: var(--acid); letter-spacing: 0.04em; }
+
+/* ‚??‚?? GOALS GRID ‚??‚?? */
+.goals-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 0; padding: 0; }
+.goal-card {
+  padding: 32px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line);
+  position: relative; overflow: hidden; cursor: pointer;
+  transition: background 0.2s;
+}
+.goal-card:hover { background: rgba(255,255,255,0.012); }
+.goal-card-idx { font-family: var(--font-display); font-size: 56px; font-weight: 900; color: var(--dim); line-height: 1; margin-bottom: 8px; }
+.goal-card-name { font-family: var(--font-display); font-size: 22px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 4px; }
+.goal-card-sub { font-family: var(--font-mono); font-size: 9px; color: var(--muted); letter-spacing: 0.1em; margin-bottom: 20px; }
+.goal-card-bar-track { height: 2px; background: var(--dim); overflow: hidden; margin-bottom: 16px; }
+.goal-card-bar-fill { height: 100%; width: 0%; transition: width 1.4s cubic-bezier(0.22,1,0.36,1); }
+.goal-card-footer { display: flex; justify-content: space-between; align-items: baseline; }
+.goal-card-pct { font-family: var(--font-display); font-size: 52px; font-weight: 900; line-height: 1; }
+.goal-card-eta { font-family: var(--font-mono); font-size: 8px; color: var(--muted); letter-spacing: 0.12em; text-transform: uppercase; text-align: right; }
+
+/* ‚??‚?? ANALYTICS ‚??‚?? */
+.analytics-grid { display: flex; flex-direction: column; gap: 0; }
+.analytics-charts-row { display: flex; gap: 0; margin-top: 24px; }
+.analytics-charts-row .full-panel { margin-top: 0; }
+.analytics-charts-row .full-panel + .full-panel { border-left: none; }
+
+/* Recurring transactions */
+.rec-row {
+  display: grid; grid-template-columns: 1fr 120px 120px 100px;
+  padding: 14px 0; border-bottom: 1px solid var(--line2);
+  align-items: center; gap: 12px;
+}
+.rec-row:last-child { border-bottom: none; }
+.rec-name { font-family: var(--font-display); font-size: 15px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+.rec-sub { font-family: var(--font-mono); font-size: 8px; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; margin-top: 2px; }
+.rec-freq { font-family: var(--font-mono); font-size: 9px; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; }
+.rec-next { font-family: var(--font-mono); font-size: 9px; color: var(--muted); }
+.rec-amount { font-family: var(--font-display); font-size: 18px; font-weight: 800; text-align: right; }
+
+/* ‚??‚?? LOADING STATE ‚??‚?? */
+.page-loading {
+  font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.2em;
+  color: var(--muted); text-transform: uppercase; padding: 48px 0; text-align: center;
+}
+.blink { animation: blink 1s step-end infinite; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+.ops-grid { display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 0; border: 1px solid var(--line); margin-top: 24px; }
+.ops-panel { padding: 28px 32px; border-right: 1px solid var(--line); }
+.ops-panel:last-child { border-right: none; }
+.ops-subtitle { color: #9a988f; font-size: 13px; line-height: 1.7; margin-bottom: 18px; }
+.form-stack { display: grid; gap: 14px; }
+.form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.form-field { display: grid; gap: 8px; }
+.form-field label { font-family: var(--font-mono); font-size: 9px; color: var(--muted); letter-spacing: 0.18em; text-transform: uppercase; }
+.form-input, .form-select, .form-textarea {
+  width: 100%; border: 1px solid var(--line); background: rgba(255,255,255,0.02); color: var(--offwhite);
+  padding: 13px 14px; font: inherit; transition: border-color 0.18s ease, transform 0.18s ease;
+}
+.form-textarea { min-height: 110px; resize: vertical; }
+.form-input:focus-visible, .form-select:focus-visible, .form-textarea:focus-visible {
+  outline: none; border-color: rgba(200,240,0,0.35); transform: translateY(-1px);
+}
+.form-actions { display: flex; gap: 10px; align-items: center; }
+.form-btn {
+  border: 1px solid var(--line); background: transparent; color: var(--offwhite); cursor: pointer;
+  padding: 12px 18px; font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.18em;
+  text-transform: uppercase; transition: transform 0.18s ease, background 0.18s ease, border-color 0.18s ease;
+}
+.form-btn:hover, .form-btn:focus-visible { outline: none; transform: translateY(-1px); border-color: rgba(200,240,0,0.28); }
+.form-btn:active { transform: translateY(1px); }
+.form-btn.primary { background: var(--acid); color: #050505; border-color: rgba(200,240,0,0.24); }
+.form-btn.secondary { color: var(--muted); }
+.form-status { min-height: 18px; font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.06em; }
+.form-status.ok { color: var(--acid); }
+.form-status.err { color: #ff8b57; }
+.mini-list { display: grid; gap: 12px; }
+.mini-item { border-top: 1px solid var(--line2); padding-top: 12px; }
+.mini-item:first-child { border-top: none; padding-top: 0; }
+.mini-label { font-family: var(--font-mono); font-size: 8px; color: var(--muted); letter-spacing: 0.18em; text-transform: uppercase; margin-bottom: 6px; }
+.mini-value { font-family: var(--font-display); font-size: 18px; letter-spacing: 0.03em; text-transform: uppercase; }
+.insights-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0; border-top: 1px solid var(--line); }
+.insight-block { padding: 24px 28px; border-right: 1px solid var(--line); }
+.insight-block:last-child { border-right: none; }
+.insight-list { display: grid; gap: 12px; margin-top: 14px; }
+.insight-mini { border-top: 1px solid var(--line2); padding-top: 12px; }
+.insight-mini:first-child { border-top: none; padding-top: 0; }
+
+@media (max-width: 900px) {
+  .tx-full-header, .tx-full-row { grid-template-columns: 40px 1fr 100px 90px; }
+  .tx-full-header span:nth-child(3),
+  .tx-full-row .tx-full-cat { display: none; }
+  .analytics-charts-row { flex-direction: column; }
+  .ops-grid, .form-grid, .insights-grid { grid-template-columns: 1fr; }
+  .ops-panel, .insight-block { border-right: none; border-bottom: 1px solid var(--line); }
+  .ops-panel:last-child, .insight-block:last-child { border-bottom: none; }
+}
+</style>
+</head>
+<body>
+
+<div id="cursor"></div>
+<div id="cursor-outer"></div>
+
+<div id="shell">
+
+  <!-- SIDEBAR -->
+  <nav id="sidebar">
+    <div class="logo-vert">FIN<span>T</span>RACK</div>
+
+    <div class="nav-icon active clickable" data-page="overview" title="overview">
+      <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="0.5"/><rect x="14" y="3" width="7" height="7" rx="0.5"/><rect x="3" y="14" width="7" height="7" rx="0.5"/><rect x="14" y="14" width="7" height="7" rx="0.5"/></svg>
+    </div>
+    <div class="nav-icon clickable" data-page="transactions" title="transactions">
+      <svg viewBox="0 0 24 24"><path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4"/></svg>
+    </div>
+    <div class="nav-icon clickable" data-page="budgets" title="budgets">
+      <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="0.5"/><path d="M8 21h8M12 17v4"/></svg>
+    </div>
+    <div class="nav-icon clickable" data-page="goals" title="goals">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+    </div>
+    <div class="nav-icon clickable" data-page="analytics" title="analytics">
+      <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+    </div>
+    <div style="flex:1"></div>
+    <div class="nav-icon clickable" title="settings">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+    </div>
+  </nav>
+
+  <!-- MAIN -->
+  <div id="main">
+
+    <!-- TOPBAR -->
+    <div id="topbar">
+      <div class="tb-left">
+        <span class="tb-label">Overview</span>
+        <div class="tb-sep"></div>
+        <div class="tb-nav">
+          <div class="tn on clickable" data-page="overview">Overview</div>
+          <div class="tn clickable" data-page="transactions">Transactions</div>
+          <div class="tn clickable" data-page="budgets">Budgets</div>
+          <div class="tn clickable" data-page="goals">Goals</div>
+          <div class="tn clickable" data-page="analytics">Analytics</div>
+        </div>
+      </div>
+      <div class="tb-right">
+        <div class="brand-name">
+          <div class="brand-letters">FIN<span class="accent">TRACK</span></div>
+          <div class="brand-tag"><span>v2.1</span>Finance OS</div>
+        </div>
+        <div class="tb-sep"></div>
+        <div class="live-ind"><div class="pulse"></div>Live</div>
+        <div class="clock" id="clk">00:00:00</div>
+        <div class="user-chip clickable" id="userChip" aria-label="Open account">
+          <div class="user-dot" id="userInitials">A</div>
+          <span id="userName">Demo Mode</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONTENT -->
+    <div id="content">
+
+    <!-- ‚?ê‚?ê PAGE: OVERVIEW ‚?ê‚?ê -->
+    <div data-page="overview">
+
+      <!-- ‚??‚?? HERO ‚??‚?? -->
+      <div class="hero-section reveal">
+        <div class="hero-meta">
+          Net Worth <span class="hero-meta-sep">/</span> March 2026 <span class="hero-meta-sep">/</span> INR
+        </div>
+        <div class="hero-numblock">
+          <div class="hero-currency">‚?π</div>
+          <div class="hero-number"><span id="hero-int">0</span><span class="frac">.<span id="hero-dec">00</span></span></div>
+          <div class="hero-badge">
+            <div class="badge-delta">+ 8.4% THIS MONTH</div>
+            <div class="badge-label">vs ‚?π11,48,200 last month</div>
+          </div>
+        </div>
+        <div class="hero-stats-row">
+          <div class="hs-item">
+            <div class="hs-label">Statement Income</div>
+            <div class="hs-value up">‚?π<span class="mc" data-t="142000">0</span></div>
+            <div class="hs-delta up">+ 12.1% vs last month</div>
+          </div>
+          <div class="hs-item">
+            <div class="hs-label">Statement Expenses</div>
+            <div class="hs-value dn">‚?π<span class="mc" data-t="93500">0</span></div>
+            <div class="hs-delta dn">+ 3.2% vs last month</div>
+          </div>
+          <div class="hs-item">
+            <div class="hs-label">Net Flow</div>
+            <div class="hs-value" style="color:var(--offwhite)">‚?π<span class="mc" data-t="48500">0</span></div>
+            <div class="hs-delta up">34.2% savings rate</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ‚??‚?? TICKER ‚??‚?? -->
+      <div class="ticker-wrap reveal">
+        <div class="ticker-track">
+          <div class="tick"><span class="tick-name">HDFC Savings</span><span class="tick-val up">‚?π4,82,000</span><span class="tick-val up">+1.2%</span></div>
+          <div class="tick"><span class="tick-name">Investments</span><span class="tick-val up">‚?π6,20,000</span><span class="tick-val up">+2.3%</span></div>
+          <div class="tick"><span class="tick-name">UPI Wallet</span><span class="tick-val">‚?π43,230</span></div>
+          <div class="tick"><span class="tick-name">Food Budget</span><span class="tick-val dn">78% Used</span></div>
+          <div class="tick"><span class="tick-name">Nifty 50</span><span class="tick-val up">22,419.95</span><span class="tick-val up">+0.4%</span></div>
+          <div class="tick"><span class="tick-name">Sensex</span><span class="tick-val up">73,958.44</span><span class="tick-val up">+0.3%</span></div>
+          <div class="tick"><span class="tick-name">USD / INR</span><span class="tick-val dn">83.47</span><span class="tick-val dn">‚??0.1%</span></div>
+          <div class="tick"><span class="tick-name">Shopping</span><span class="tick-val dn">91% Used</span></div>
+          <!-- dupe -->
+          <div class="tick"><span class="tick-name">HDFC Savings</span><span class="tick-val up">‚?π4,82,000</span><span class="tick-val up">+1.2%</span></div>
+          <div class="tick"><span class="tick-name">Investments</span><span class="tick-val up">‚?π6,20,000</span><span class="tick-val up">+2.3%</span></div>
+          <div class="tick"><span class="tick-name">UPI Wallet</span><span class="tick-val">‚?π43,230</span></div>
+          <div class="tick"><span class="tick-name">Food Budget</span><span class="tick-val dn">78% Used</span></div>
+          <div class="tick"><span class="tick-name">Nifty 50</span><span class="tick-val up">22,419.95</span><span class="tick-val up">+0.4%</span></div>
+          <div class="tick"><span class="tick-name">Sensex</span><span class="tick-val up">73,958.44</span><span class="tick-val up">+0.3%</span></div>
+          <div class="tick"><span class="tick-name">USD / INR</span><span class="tick-val dn">83.47</span><span class="tick-val dn">‚??0.1%</span></div>
+          <div class="tick"><span class="tick-name">Shopping</span><span class="tick-val dn">91% Used</span></div>
+        </div>
+      </div>
+
+      <!-- ‚??‚?? CHART + ACCOUNTS ‚??‚?? -->
+      <div class="grid-2 reveal">
+        <!-- Chart panel -->
+        <div class="panel">
+          <div class="panel-eyebrow">12-Month Performance</div>
+          <div class="chart-legend">
+            <div class="leg"><div class="leg-line" style="background:var(--acid)"></div>Income</div>
+            <div class="leg"><div class="leg-line" style="background:var(--ember)"></div>Expenses</div>
+            <div class="leg"><div class="leg-line" style="background:var(--offwhite);opacity:0.3;border-top:1px dashed var(--offwhite)"></div>Net</div>
+          </div>
+          <div class="chart-container">
+            <svg id="chartSvg"></svg>
+          </div>
+        </div>
+
+        <!-- Accounts panel -->
+        <div class="panel">
+          <div class="panel-eyebrow">Account Breakdown</div>
+          <div class="panel-title" style="margin-bottom:12px;">Net Worth</div>
+
+          <div class="donut-wrap">
+            <div style="position:relative;width:130px;height:130px;flex-shrink:0">
+              <svg width="130" height="130" viewBox="0 0 130 130" id="donut"></svg>
+              <div class="donut-center-text">
+                <div class="donut-big">‚?π12.4L</div>
+                <div class="donut-sub">Total</div>
+              </div>
+            </div>
+            <div class="donut-legend">
+              <div class="dl-item">
+                <div class="dl-left"><div class="dl-dot" style="background:var(--acid)"></div>HDFC Savings</div>
+                <div class="dl-val" style="color:var(--acid)">‚?π4.82L</div>
+              </div>
+              <div class="dl-item">
+                <div class="dl-left"><div class="dl-dot" style="background:var(--ice)"></div>Investments</div>
+                <div class="dl-val" style="color:var(--ice)">‚?π6.20L</div>
+              </div>
+              <div class="dl-item">
+                <div class="dl-left"><div class="dl-dot" style="background:var(--ember)"></div>UPI Wallet</div>
+                <div class="dl-val" style="color:var(--ember)">‚?π0.43L</div>
+              </div>
+            </div>
+          </div>
+
+          <div style="margin-top:24px;border-top:1px solid var(--line);padding-top:20px;">
+            <div class="account-row">
+              <div class="acc-left">
+                <div class="acc-dot" style="background:var(--acid);box-shadow:0 0 6px var(--acid)"></div>
+                <div><div class="acc-name">HDFC Savings</div><div class="acc-type">Savings Account</div></div>
+              </div>
+              <div class="acc-val" style="color:var(--acid)">‚?π4,82,000</div>
+            </div>
+            <div class="account-row">
+              <div class="acc-left">
+                <div class="acc-dot" style="background:var(--ice);box-shadow:0 0 6px var(--ice)"></div>
+                <div><div class="acc-name">Zerodha</div><div class="acc-type">Investment Account</div></div>
+              </div>
+              <div class="acc-val" style="color:var(--ice)">‚?π6,20,000</div>
+            </div>
+            <div class="account-row">
+              <div class="acc-left">
+                <div class="acc-dot" style="background:var(--ember);box-shadow:0 0 6px var(--ember)"></div>
+                <div><div class="acc-name">Paytm Wallet</div><div class="acc-type">UPI Wallet</div></div>
+              </div>
+              <div class="acc-val" style="color:var(--ember)">‚?π43,230</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ‚??‚?? TRANSACTIONS + BUDGETS ‚??‚?? -->
+      <div class="grid-2-equal reveal" style="border-bottom:1px solid var(--line)">
+
+        <!-- Transactions -->
+        <div class="panel">
+          <div class="panel-eyebrow">Real-Time Feed</div>
+          <div class="panel-title">Recent Transactions</div>
+          <div class="tx-header">
+            <span>Description</span>
+            <span>Date</span>
+            <span style="text-align:right">Amount</span>
+          </div>
+          <div class="tx-row clickable">
+            <div><div class="tx-name">Swiggy</div><div class="tx-cat">Food &amp; Dining</div></div>
+            <div class="tx-date">Today</div>
+            <div class="tx-amount dn">‚??‚?π480</div>
+          </div>
+          <div class="tx-row clickable">
+            <div><div class="tx-name">Salary Credit</div><div class="tx-cat">Income ¬∑ HDFC</div></div>
+            <div class="tx-date">Mar 01</div>
+            <div class="tx-amount up">+‚?π1,20,000</div>
+          </div>
+          <div class="tx-row clickable">
+            <div><div class="tx-name">Netflix</div><div class="tx-cat">Subscriptions</div></div>
+            <div class="tx-date">Mar 05</div>
+            <div class="tx-amount dn">‚??‚?π649</div>
+          </div>
+          <div class="tx-row clickable">
+            <div><div class="tx-name">IndiGo Airlines</div><div class="tx-cat">Travel</div></div>
+            <div class="tx-date">Mar 08</div>
+            <div class="tx-amount dn">‚??‚?π8,200</div>
+          </div>
+          <div class="tx-row clickable">
+            <div><div class="tx-name">Zerodha Dividend</div><div class="tx-cat">Investments</div></div>
+            <div class="tx-date">Mar 10</div>
+            <div class="tx-amount up">+‚?π3,200</div>
+          </div>
+          <div class="tx-row clickable">
+            <div><div class="tx-name">Myntra</div><div class="tx-cat">Shopping</div></div>
+            <div class="tx-date">Mar 12</div>
+            <div class="tx-amount dn">‚??‚?π2,399</div>
+          </div>
+        </div>
+
+        <!-- Budgets -->
+        <div class="panel" style="border-right:none">
+          <div class="panel-eyebrow">Budget Matrix</div>
+          <div class="panel-title">Monthly Limits</div>
+          <div class="bud-row">
+            <div class="bud-meta"><span class="bud-name">Food &amp; Dining</span><span class="bud-nums">‚?π7,800 / ‚?π10,000</span></div>
+            <div class="bud-track"><div class="bud-fill" data-w="78" style="background:var(--ember);animation-delay:0s"></div></div>
+            <div class="bud-status dn">78% used ‚?? ‚?π2,200 remaining</div>
+          </div>
+          <div class="bud-row">
+            <div class="bud-meta"><span class="bud-name">Shopping</span><span class="bud-nums">‚?π9,100 / ‚?π10,000</span></div>
+            <div class="bud-track"><div class="bud-fill" data-w="91" style="background:var(--ember);animation-delay:0.25s"></div></div>
+            <div class="bud-status dn">91% used ‚?? ‚?π900 remaining</div>
+          </div>
+          <div class="bud-row">
+            <div class="bud-meta"><span class="bud-name">Transport</span><span class="bud-nums">‚?π2,100 / ‚?π5,000</span></div>
+            <div class="bud-track"><div class="bud-fill" data-w="42" style="background:var(--acid);animation-delay:0.5s"></div></div>
+            <div class="bud-status" style="color:var(--muted)">42% used ‚?? ‚?π2,900 remaining</div>
+          </div>
+          <div class="bud-row">
+            <div class="bud-meta"><span class="bud-name">Entertainment</span><span class="bud-nums">‚?π1,450 / ‚?π5,000</span></div>
+            <div class="bud-track"><div class="bud-fill" data-w="29" style="background:var(--ice);animation-delay:0.75s"></div></div>
+            <div class="bud-status up">29% used ‚?? On track</div>
+          </div>
+          <div class="bud-row">
+            <div class="bud-meta"><span class="bud-name">Utilities</span><span class="bud-nums">‚?π2,750 / ‚?π5,000</span></div>
+            <div class="bud-track"><div class="bud-fill" data-w="55" style="background:var(--offwhite);opacity:0.6;animation-delay:1s"></div></div>
+            <div class="bud-status" style="color:var(--muted)">55% used ‚?? On track</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ‚??‚?? GOALS + INSIGHTS ‚??‚?? -->
+      <div class="grid-2-equal reveal" style="border-bottom:1px solid var(--line)">
+
+        <!-- Goals -->
+        <div class="panel">
+          <div class="panel-eyebrow">Goal Tracker</div>
+          <div class="panel-title">Savings Goals</div>
+          <div class="goal-row clickable">
+            <div class="goal-index">01</div>
+            <div class="goal-body">
+              <div class="goal-name">Emergency Fund</div>
+              <div class="goal-bar-track"><div class="goal-bar-fill" data-w="62" style="background:var(--acid)"></div></div>
+            </div>
+            <div class="goal-right">
+              <div class="goal-pct up">62%</div>
+              <div class="goal-eta">~3 months left</div>
+            </div>
+          </div>
+          <div class="goal-row clickable">
+            <div class="goal-index">02</div>
+            <div class="goal-body">
+              <div class="goal-name">Goa Vacation</div>
+              <div class="goal-bar-track"><div class="goal-bar-fill" data-w="38" style="background:var(--ember)"></div></div>
+            </div>
+            <div class="goal-right">
+              <div class="goal-pct" style="color:var(--ember)">38%</div>
+              <div class="goal-eta">~5 months left</div>
+            </div>
+          </div>
+          <div class="goal-row clickable">
+            <div class="goal-index">03</div>
+            <div class="goal-body">
+              <div class="goal-name">MacBook Pro</div>
+              <div class="goal-bar-track"><div class="goal-bar-fill" data-w="15" style="background:var(--ice)"></div></div>
+            </div>
+            <div class="goal-right">
+              <div class="goal-pct" style="color:var(--ice)">15%</div>
+              <div class="goal-eta">~14 months left</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Insights -->
+        <div class="panel" style="border-right:none">
+          <div class="panel-eyebrow">AI Analysis</div>
+          <div class="panel-title">Financial Insights</div>
+          <div id="overviewInsightsList">
+          <div class="insight-row clickable">
+            <div class="insight-tag up">WIN</div>
+            <div class="insight-text"><strong>Emergency fund</strong> on pace ‚?? completing in approximately 3 months at current contribution rate.</div>
+          </div>
+          <div class="insight-row clickable">
+            <div class="insight-tag dn">FLAG</div>
+            <div class="insight-text"><strong>Shopping budget</strong> at 91% with 16 days remaining. Reduce spend by ‚?π900 to avoid overage.</div>
+          </div>
+          <div class="insight-row clickable">
+            <div class="insight-tag up">HIGH</div>
+            <div class="insight-text"><strong>Savings rate 34.2%</strong> ‚?? highest in 6 months. Income growth outpacing expense growth by 8.9pp.</div>
+          </div>
+          <div class="insight-row clickable">
+            <div class="insight-tag" style="color:var(--ice)">INFO</div>
+            <div class="insight-text"><strong>Zerodha portfolio</strong> up ‚?π14,230 this month. Dividend of ‚?π3,200 credited on Mar 10.</div>
+          </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /page:overview -->
+
+    <!-- ‚?ê‚?ê PAGE: TRANSACTIONS ‚?ê‚?ê -->
+    <div data-page="transactions" style="display:none">
+      <div class="page-hero">
+        <div class="page-hero-left">
+          <div class="page-eyebrow">Real-Time Feed</div>
+          <div class="page-title">Transactions</div>
+        </div>
+        <div class="page-hero-right">
+          <div class="filter-row">
+            <select id="tx-filter-type" class="ft-select">
+              <option value="">All Types</option>
+              <option value="CREDIT">Income</option>
+              <option value="DEBIT">Expense</option>
+            </select>
+            <select id="tx-filter-cat" class="ft-select">
+              <option value="">All Categories</option>
+            </select>
+            <div class="ft-search-wrap">
+              <input id="tx-search" class="ft-input" type="text" placeholder="Search transactions..."/>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="ops-grid">
+        <div class="ops-panel">
+          <div class="panel-eyebrow">Statement Pipeline</div>
+          <div class="panel-title" style="margin-bottom:12px">Upload Statement</div>
+          <div class="ops-subtitle">Upload a CSV or machine-readable PDF bank statement, map it to an account, and let the backend parse, categorize, and store transactions automatically.</div>
+          <form class="form-stack" id="accountCreateForm" style="margin:18px 0 20px;padding:16px;border:1px solid var(--line);background:rgba(255,255,255,0.02)">
+            <div class="form-grid">
+              <div class="form-field">
+                <label for="accountName">New Account Name</label>
+                <input class="form-input" id="accountName" type="text" placeholder="HDFC Savings"/>
+              </div>
+              <div class="form-field">
+                <label for="accountType">Account Type</label>
+                <select class="form-select" id="accountType">
+                  <option value="SAVINGS">Savings</option>
+                  <option value="CHECKING">Checking</option>
+                  <option value="WALLET">Wallet</option>
+                  <option value="CREDIT_CARD">Credit Card</option>
+                  <option value="INVESTMENT">Investment</option>
+                  <option value="CASH">Cash</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-grid">
+              <div class="form-field">
+                <label for="accountBalance">Opening Balance</label>
+                <input class="form-input" id="accountBalance" type="number" min="0" step="0.01" placeholder="0"/>
+              </div>
+              <div class="form-field">
+                <label for="accountInstitution">Institution</label>
+                <input class="form-input" id="accountInstitution" type="text" placeholder="HDFC Bank"/>
+              </div>
+            </div>
+            <div class="form-actions">
+              <button class="form-btn primary" id="accountCreateSubmit" type="submit">Create Account</button>
+            </div>
+            <div class="form-status" id="accountCreateStatus"></div>
+          </form>
+          <form class="form-stack" id="statementUploadForm">
+            <div class="form-grid">
+              <div class="form-field">
+                <label for="statementAccount">Account</label>
+                <select class="form-select" id="statementAccount" required></select>
+              </div>
+              <div class="form-field">
+                <label for="statementSource">Source</label>
+                <input class="form-input" id="statementSource" type="text" placeholder="HDFC Bank CSV"/>
+              </div>
+            </div>
+            <div class="form-grid">
+              <div class="form-field">
+                <label for="statementDate">Statement Date</label>
+                <input class="form-input" id="statementDate" type="date"/>
+              </div>
+              <div class="form-field">
+                <label for="statementFile">Statement File</label>
+                <input class="form-input" id="statementFile" type="file" accept=".csv,text/csv,.pdf,application/pdf" required/>
+              </div>
+            </div>
+            <div class="form-field">
+              <label for="statementApplyBalance">Balance Sync</label>
+              <select class="form-select" id="statementApplyBalance">
+                <option value="false">Do not change account balance</option>
+                <option value="true">Apply imported net change to account balance</option>
+              </select>
+            </div>
+            <div class="form-actions">
+              <button class="form-btn primary" id="statementUploadSubmit" type="submit">Process Statement</button>
+              <button class="form-btn secondary" id="statementRefreshBtn" type="button">Refresh Statements</button>
+            </div>
+            <div class="form-status" id="statementUploadStatus"></div>
+          </form>
+        </div>
+        <div class="ops-panel">
+          <div class="panel-eyebrow">Import Ledger</div>
+          <div class="panel-title" style="margin-bottom:12px">Recent Uploads</div>
+          <div class="mini-list" id="statementHistoryList">
+            <div class="page-loading" style="padding:12px 0">Loading statements<span class="blink">_</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="full-panel">
+        <div class="tx-full-header">
+          <span>#</span><span>Description</span><span>Category</span><span>Account</span><span>Date</span><span style="text-align:right">Amount</span>
+        </div>
+        <div id="tx-full-list">
+          <div class="page-loading">Fetching transactions<span class="blink">_</span></div>
+        </div>
+        <div class="pagination-row">
+          <button class="pg-btn" id="tx-prev" disabled>PREV</button>
+          <span class="pg-info" id="tx-page-info">‚?? / ‚??</span>
+          <button class="pg-btn" id="tx-next">NEXT</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ‚?ê‚?ê PAGE: BUDGETS ‚?ê‚?ê -->
+    <div data-page="budgets" style="display:none">
+      <div class="page-hero">
+        <div class="page-hero-left">
+          <div class="page-eyebrow">Budget Matrix</div>
+          <div class="page-title">Monthly Limits</div>
+        </div>
+        <div class="page-hero-right">
+          <div class="month-label" id="bud-period">MAR 2026</div>
+        </div>
+      </div>
+      <div id="bud-summary-row" class="stat-strip"></div>
+      <div id="bud-full-list" class="full-panel bud-grid">
+        <div class="page-loading">Loading budgets<span class="blink">_</span></div>
+      </div>
+    </div>
+
+    <!-- ‚?ê‚?ê PAGE: GOALS ‚?ê‚?ê -->
+    <div data-page="goals" style="display:none">
+      <div class="page-hero">
+        <div class="page-hero-left">
+          <div class="page-eyebrow">Goal Tracker</div>
+          <div class="page-title">Savings Goals</div>
+        </div>
+        <div class="page-hero-right">
+          <div class="ft-search-wrap">
+            <div class="stat-chip" id="goals-total-chip">Total Saved: ‚?π0</div>
+          </div>
+        </div>
+      </div>
+      <div class="ops-grid">
+        <div class="ops-panel">
+          <div class="panel-eyebrow">Financial Setup</div>
+          <div class="panel-title" style="margin-bottom:12px">Monthly Profile</div>
+          <div class="ops-subtitle">Define your recurring rent, savings target, and overall monthly budget so the backend can generate more accurate recommendations.</div>
+          <form class="form-stack" id="financialGoalForm">
+            <div class="form-grid">
+              <div class="form-field">
+                <label for="goalRent">Rent</label>
+                <input class="form-input" id="goalRent" type="number" min="0" step="0.01" placeholder="18000"/>
+              </div>
+              <div class="form-field">
+                <label for="goalSavings">Savings Goal</label>
+                <input class="form-input" id="goalSavings" type="number" min="0" step="0.01" placeholder="50000"/>
+              </div>
+            </div>
+            <div class="form-grid">
+              <div class="form-field">
+                <label for="goalBudget">Monthly Budget</label>
+                <input class="form-input" id="goalBudget" type="number" min="0" step="0.01" placeholder="70000"/>
+              </div>
+              <div class="form-field">
+                <label for="goalNotes">Notes</label>
+                <input class="form-input" id="goalNotes" type="text" placeholder="Keep food under control"/>
+              </div>
+            </div>
+            <div class="form-actions">
+              <button class="form-btn primary" id="goalSaveBtn" type="submit">Save Profile</button>
+              <button class="form-btn secondary" id="goalReloadBtn" type="button">Reload</button>
+            </div>
+            <div class="form-status" id="financialGoalStatus"></div>
+          </form>
+        </div>
+        <div class="ops-panel">
+          <div class="panel-eyebrow">Current Setup</div>
+          <div class="panel-title" style="margin-bottom:12px">Goal Snapshot</div>
+          <div class="mini-list" id="goalProfileSummary">
+            <div class="mini-item">
+              <div class="mini-label">Rent</div>
+              <div class="mini-value">√¢‚?¨‚?ù</div>
+            </div>
+            <div class="mini-item">
+              <div class="mini-label">Savings Goal</div>
+              <div class="mini-value">√¢‚?¨‚?ù</div>
+            </div>
+            <div class="mini-item">
+              <div class="mini-label">Monthly Budget</div>
+              <div class="mini-value">√¢‚?¨‚?ù</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div id="goals-full-list" class="full-panel goals-grid">
+        <div class="page-loading">Loading goals<span class="blink">_</span></div>
+      </div>
+    </div>
+
+    <!-- ‚?ê‚?ê PAGE: ANALYTICS ‚?ê‚?ê -->
+    <div data-page="analytics" style="display:none">
+      <div class="page-hero">
+        <div class="page-hero-left">
+          <div class="page-eyebrow">Performance Analysis</div>
+          <div class="page-title">Analytics</div>
+        </div>
+      </div>
+      <div class="analytics-grid">
+        <!-- KPI strip -->
+        <div id="analytics-kpis" class="full-panel stat-strip-lg"></div>
+        <!-- Charts row -->
+        <div class="analytics-charts-row">
+          <div class="full-panel" style="flex:2">
+            <div class="panel-eyebrow">Income vs Expenses ‚?? 12 Months</div>
+            <div class="chart-container" style="height:260px">
+              <svg id="analyticsChartSvg" style="width:100%;height:100%;overflow:visible"></svg>
+            </div>
+          </div>
+          <div class="full-panel" style="flex:1">
+            <div class="panel-eyebrow">Spending by Category</div>
+            <div style="display:flex;flex-direction:column;align-items:center;padding-top:12px">
+              <div style="position:relative;width:160px;height:160px">
+                <svg width="160" height="160" viewBox="0 0 160 160" id="analyticsDonut"></svg>
+                <div class="donut-center-text">
+                  <div class="donut-big" id="analytics-donut-center">‚??</div>
+                  <div class="donut-sub">Expenses</div>
+                </div>
+              </div>
+              <div id="analytics-cat-legend" style="width:100%;margin-top:20px;display:flex;flex-direction:column;gap:8px"></div>
+            </div>
+          </div>
+        </div>
+        <!-- Recurring transactions -->
+        <div class="full-panel">
+          <div class="panel-eyebrow">Recurring Transactions</div>
+          <div class="panel-title" style="margin-bottom:20px">Fixed Commitments</div>
+          <div id="recurring-list">
+            <div class="page-loading">Loading<span class="blink">_</span></div>
+          </div>
+        </div>
+        <div class="full-panel">
+          <div class="panel-eyebrow">AI Insights</div>
+          <div class="panel-title" style="margin-bottom:20px">Forecasts & Recommendations</div>
+          <div class="insights-grid">
+            <div class="insight-block">
+              <div class="stat-cell-label">Prediction</div>
+              <div class="stat-cell-val up" id="insightPredictionVal">√¢‚?¨‚?ù</div>
+              <div class="insight-list" id="insightPatternsList">
+                <div class="page-loading" style="padding:12px 0">Loading insights<span class="blink">_</span></div>
+              </div>
+            </div>
+            <div class="insight-block">
+              <div class="stat-cell-label">Anomalies</div>
+              <div class="stat-cell-val" id="insightAnomalyCount">0</div>
+              <div class="insight-list" id="insightAnomaliesList"></div>
+            </div>
+            <div class="insight-block">
+              <div class="stat-cell-label">Recommendations</div>
+              <div class="stat-cell-val" id="insightSavingsPotential">√¢‚?¨‚?ù</div>
+              <div class="insight-list" id="insightRecommendationsList"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    </div><!-- /content -->
+  </div><!-- /main -->
+</div><!-- /shell -->
+
+<div class="auth-modal" id="authModal" hidden>
+  <div class="auth-card" id="authCard">
+    <div class="auth-head">
+      <div class="auth-kicker">API Access</div>
+      <div class="auth-title" id="authTitle">Connect FinTrack</div>
+      <div class="auth-subtitle" id="authSubtitle">Sign in to replace the static dashboard with your real accounts, budgets, transactions, and goals.</div>
+    </div>
+    <div class="auth-body">
+      <div class="auth-toggle" id="authToggle">
+        <button class="auth-tab active" type="button" data-auth-mode="login">Login</button>
+        <button class="auth-tab" type="button" data-auth-mode="register">Register</button>
+      </div>
+      <div class="auth-note" id="authNote">Connected to the local Docker API at `/api`.</div>
+      <form class="auth-form" id="authForm">
+        <div class="auth-field optional" id="authFullNameField" hidden>
+          <label for="authFullName">Full Name</label>
+          <input class="auth-input" id="authFullName" name="fullName" type="text" autocomplete="name" placeholder="Aarav Sharma"/>
+        </div>
+        <div class="auth-field">
+          <label for="authEmail">Email</label>
+          <input class="auth-input" id="authEmail" name="email" type="email" autocomplete="email" placeholder="you@example.com" required/>
+        </div>
+        <div class="auth-field">
+          <label for="authPassword">Password</label>
+          <input class="auth-input" id="authPassword" name="password" type="password" autocomplete="current-password" placeholder="Minimum 8 characters" required/>
+        </div>
+        <div class="auth-error" id="authError"></div>
+        <div class="auth-actions">
+          <button class="auth-btn primary" id="authSubmit" type="submit">Login</button>
+          <button class="auth-btn secondary" id="authClose" type="button">Close</button>
+        </div>
+      </form>
+      <div class="auth-session" id="authSession">
+        <div class="auth-session-box">
+          <div class="auth-session-label">Connected User</div>
+          <div class="auth-session-name" id="authSessionName">Demo Mode</div>
+          <div class="auth-session-meta" id="authSessionMeta">The dashboard will use the active access token for all API requests.</div>
+        </div>
+        <div class="auth-actions">
+          <button class="auth-btn primary" id="authRefresh" type="button">Refresh Data</button>
+          <button class="auth-btn secondary" id="authLogout" type="button">Logout</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê
+// CONFIG ‚?? change BASE_URL if you move the backend
+// ‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê
+const BASE_URL = '/api';
+const AUTH_STORAGE_KEY = 'fintrack.auth';
+let authMode = 'login';
+let authState = loadAuthState();
+let accountCache = [];
+let statementCache = [];
+
+// ‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê
+// API LAYER
+// All fetches go through here. Returns null on any
+// error so callers can fall back to static values.
+// ‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê
+function loadAuthState() {
+  try {
+    const raw = localStorage.getItem(AUTH_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : { accessToken: null, refreshToken: null, user: null };
+  } catch (err) {
+    return { accessToken: null, refreshToken: null, user: null };
+  }
+}
+
+function saveAuthState(nextState) {
+  authState = {
+    accessToken: nextState?.accessToken ?? null,
+    refreshToken: nextState?.refreshToken ?? null,
+    user: nextState?.user ?? null,
+  };
+  localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(authState));
+  syncAuthUi();
+}
+
+function clearAuthState() {
+  authState = { accessToken: null, refreshToken: null, user: null };
+  localStorage.removeItem(AUTH_STORAGE_KEY);
+  syncAuthUi();
+}
+
+function getInitials(name) {
+  if (!name) return 'FT';
+  return name
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map(part => part[0]?.toUpperCase() || '')
+    .join('') || 'FT';
+}
+
+function setConnectionState(label, tone = 'var(--muted)') {
+  const liveInd = document.querySelector('.live-ind');
+  if (!liveInd) return;
+  liveInd.innerHTML = `<div class="pulse" style="background:${tone};box-shadow:0 0 8px ${tone}"></div>${label}`;
+}
+
+function syncAuthUi() {
+  const authenticated = !!authState.accessToken;
+  const userName = authState.user?.fullName || authState.user?.email || 'Demo Mode';
+  const initials = getInitials(userName);
+
+  const nameEl = document.getElementById('userName');
+  const initialsEl = document.getElementById('userInitials');
+  const authCard = document.getElementById('authCard');
+  const authSessionName = document.getElementById('authSessionName');
+  const authSessionMeta = document.getElementById('authSessionMeta');
+  const authClose = document.getElementById('authClose');
+
+  if (nameEl) nameEl.textContent = userName;
+  if (initialsEl) initialsEl.textContent = initials;
+  if (authCard) authCard.classList.toggle('is-authenticated', authenticated);
+  if (authSessionName) authSessionName.textContent = userName;
+  if (authSessionMeta) {
+    authSessionMeta.textContent = authenticated
+      ? `${authState.user?.email || 'Authenticated'}${authState.user?.currency ? ` ‚?¢ Base currency ${authState.user.currency}` : ''}`
+      : 'The dashboard is currently showing its built-in fallback data.';
+  }
+  if (authClose) authClose.textContent = authenticated ? 'Done' : 'Close';
+
+  if (!authenticated) {
+    setConnectionState('Sign In', 'var(--ember)');
+  }
+}
+
+function setAuthMode(mode) {
+  authMode = mode === 'register' ? 'register' : 'login';
+  document.querySelectorAll('[data-auth-mode]').forEach(el => {
+    el.classList.toggle('active', el.dataset.authMode === authMode);
+  });
+  const fullNameField = document.getElementById('authFullNameField');
+  const title = document.getElementById('authTitle');
+  const subtitle = document.getElementById('authSubtitle');
+  const submit = document.getElementById('authSubmit');
+  const fullNameInput = document.getElementById('authFullName');
+  if (fullNameField) fullNameField.hidden = authMode !== 'register';
+  if (fullNameInput) fullNameInput.required = authMode === 'register';
+  if (title) title.textContent = authMode === 'register' ? 'Create FinTrack ID' : 'Connect FinTrack';
+  if (subtitle) {
+    subtitle.textContent = authMode === 'register'
+      ? 'Create an account, receive tokens, and start pulling your own financial data into this dashboard.'
+      : 'Sign in to replace the static dashboard with your real accounts, budgets, transactions, and goals.';
+  }
+  if (submit) submit.textContent = authMode === 'register' ? 'Register' : 'Login';
+  setAuthError('');
+}
+
+function setAuthError(message) {
+  const errorEl = document.getElementById('authError');
+  if (errorEl) errorEl.textContent = message || '';
+}
+
+function showAuthModal(mode = authMode) {
+  const modal = document.getElementById('authModal');
+  if (!modal) return;
+  setAuthMode(mode);
+  modal.hidden = false;
+}
+
+function hideAuthModal() {
+  const modal = document.getElementById('authModal');
+  if (modal) modal.hidden = true;
+}
+
+async function authRequest(path, payload) {
+  const res = await fetch(`${BASE_URL}${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    let message = `HTTP ${res.status}`;
+    try {
+      const data = await res.json();
+      message = data?.message || message;
+    } catch (err) {}
+    throw new Error(message);
+  }
+
+  return res.status === 204 ? null : res.json();
+}
+
+async function refreshAccessToken() {
+  if (!authState.refreshToken) return false;
+  try {
+    const next = await authRequest('/auth/refresh', { refreshToken: authState.refreshToken });
+    saveAuthState({
+      accessToken: next.accessToken,
+      refreshToken: next.refreshToken,
+      user: next.user || authState.user,
+    });
+    return true;
+  } catch (err) {
+    clearAuthState();
+    return false;
+  }
+}
+
+async function api(path, options = {}) {
+  const { retryAuth = true, throwOnError = false, ...fetchOptions } = options;
+  try {
+    const isFormData = typeof FormData !== 'undefined' && fetchOptions.body instanceof FormData;
+    const baseHeaders = {
+      ...(authState.accessToken ? { Authorization: `Bearer ${authState.accessToken}` } : {}),
+      ...(fetchOptions.headers || {}),
+    };
+    const res = await fetch(`${BASE_URL}${path}`, {
+      ...fetchOptions,
+      headers: isFormData ? baseHeaders : { 'Content-Type': 'application/json', ...baseHeaders }
+    });
+    if (res.status === 401 && retryAuth && authState.refreshToken) {
+      const refreshed = await refreshAccessToken();
+      if (refreshed) return api(path, { ...options, retryAuth: false });
+    }
+    if ((res.status === 401 || res.status === 403) && !authState.refreshToken) {
+      clearAuthState();
+      showAuthModal('login');
+    }
+    if (res.status === 403 && retryAuth && authState.refreshToken) {
+      const refreshed = await refreshAccessToken();
+      if (refreshed) return api(path, { ...options, retryAuth: false });
+      clearAuthState();
+      showAuthModal('login');
+    }
+    if (!res.ok) {
+      let message = `HTTP ${res.status}`;
+      try {
+        const data = await res.json();
+        message = data?.message || message;
+      } catch (err) {}
+      if (res.status === 401 || res.status === 403) {
+        message = 'Session expired. Please log in again.';
+      }
+      throw new Error(message);
+    }
+    return res.status === 204 ? null : await res.json();
+  } catch (err) {
+    console.warn(`[FinTrack] API call failed for ${path}:`, err.message);
+    if (throwOnError) throw err;
+    return null;
+  }
+}
+
+// ‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê
+// HELPERS
+// ‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê
+const fmt = (n) => Math.round(n).toLocaleString('en-IN');
+const fmtFull = (n) => Number(n).toLocaleString('en-IN', { maximumFractionDigits: 2 });
+const money = (n) => `INR ${fmt(Number(n || 0))}`;
+
+function signedAmount(tx) {
+  const raw = Math.abs(Number(tx?.amount ?? 0));
+  const type = (tx?.type ?? '').toUpperCase();
+  if (type === 'EXPENSE') return -raw;
+  if (type === 'TRANSFER') return 0;
+  return raw;
+}
+
+function pctColor(pct) {
+  if (pct >= 90) return 'var(--ember)';
+  if (pct >= 70) return 'var(--ember)';
+  return 'var(--acid)';
+}
+
+function deltaClass(n) { return n >= 0 ? 'up' : 'dn'; }
+function transactionDisplayClass(tx) { return signedAmount(tx) >= 0 ? 'up' : 'dn'; }
+function transactionDisplaySign(tx) { return signedAmount(tx) >= 0 ? '+' : '-'; }
+
+function relativeDate(dateStr) {
+  if (!dateStr) return '‚??';
+  const d = new Date(dateStr);
+  const now = new Date();
+  const diff = Math.floor((now - d) / 86400000);
+  if (diff === 0) return 'Today';
+  if (diff === 1) return 'Yesterday';
+  return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+}
+
+function normalizeLabel(value, fallback = 'Other') {
+  return (value ?? '').toString().trim() || fallback;
+}
+
+function deriveBudgetRowsFromCategories(categories) {
+  const rows = Array.isArray(categories) ? categories : [];
+  const total = rows.reduce((sum, item) => sum + Number(item.totalSpent ?? item.amount ?? 0), 0);
+  return rows
+    .filter(item => Number(item.totalSpent ?? item.amount ?? 0) > 0)
+    .slice(0, 5)
+    .map(item => {
+      const spent = Number(item.totalSpent ?? item.amount ?? 0);
+      const share = total > 0 ? Math.round((spent / total) * 100) : 0;
+      return {
+        name: item.name ?? item.category ?? 'Category',
+        spent,
+        limit: total || spent || 1,
+        percentUsed: share,
+        derived: true,
+      };
+    });
+}
+
+function deriveRecurringCandidates(transactions) {
+  const grouped = new Map();
+  (Array.isArray(transactions) ? transactions : []).forEach(tx => {
+    if ((tx?.type ?? '').toUpperCase() !== 'EXPENSE') return;
+    const key = normalizeLabel(tx.merchant ?? tx.description, '').toUpperCase();
+    if (!key) return;
+    const existing = grouped.get(key) ?? {
+      label: tx.merchant ?? tx.description ?? 'Transaction',
+      category: tx.category ?? tx.categoryName ?? 'Uncategorized',
+      count: 0,
+      total: 0,
+      lastDate: tx.date ?? tx.transactionDate ?? null,
+    };
+    existing.count += 1;
+    existing.total += Math.abs(signedAmount(tx));
+    const txDate = tx.date ?? tx.transactionDate ?? null;
+    if (txDate && (!existing.lastDate || new Date(txDate) > new Date(existing.lastDate))) {
+      existing.lastDate = txDate;
+    }
+    grouped.set(key, existing);
+  });
+
+  return [...grouped.values()]
+    .filter(item => item.count >= 2)
+    .sort((a, b) => b.count - a.count || b.total - a.total)
+    .slice(0, 5);
+}
+
+function insightTone(severity) {
+  const key = (severity ?? '').toUpperCase();
+  if (key === 'WARNING' || key === 'HIGH' || key === 'MEDIUM') return { label: 'FLAG', cls: 'dn', style: '' };
+  if (key === 'INFO') return { label: 'INFO', cls: '', style: 'color:var(--ice)' };
+  return { label: 'LIVE', cls: 'up', style: '' };
+}
+
+function renderOverviewInsights(insights, dashboard) {
+  const list = document.getElementById('overviewInsightsList');
+  if (!list) return;
+
+  const rows = [];
+  const patterns = Array.isArray(insights?.patterns) ? insights.patterns : [];
+  const recommendations = Array.isArray(insights?.recommendations) ? insights.recommendations : [];
+  const anomalies = Array.isArray(insights?.anomalies) ? insights.anomalies : [];
+  const budgetAlerts = Array.isArray(dashboard?.budgetAlerts) ? dashboard.budgetAlerts : [];
+
+  patterns.slice(0, 2).forEach(item => rows.push({
+    title: item.title ?? 'Pattern',
+    detail: item.detail ?? '',
+    severity: item.severity ?? 'INFO',
+  }));
+  recommendations.slice(0, 1).forEach(item => rows.push({
+    title: item.title ?? 'Recommendation',
+    detail: item.detail ?? '',
+    severity: 'WARNING',
+  }));
+  anomalies.slice(0, 1).forEach(item => rows.push({
+    title: item.description ?? 'Anomaly',
+    detail: item.reason ?? 'Unusual activity detected.',
+    severity: item.severity ?? 'WARNING',
+  }));
+  budgetAlerts.slice(0, 1).forEach(item => rows.push({
+    title: item.name ?? 'Budget alert',
+    detail: `${Number(item.percentUsed ?? 0).toFixed(0)}% of the configured budget has been used.`,
+    severity: item.status === 'EXCEEDED' ? 'HIGH' : 'WARNING',
+  }));
+
+  if (!rows.length) {
+    list.innerHTML = `<div class="page-loading" style="padding:12px 0">No AI insights yet<span class="blink">_</span></div>`;
+    return;
+  }
+
+  list.innerHTML = rows.slice(0, 4).map(item => {
+    const tone = insightTone(item.severity);
+    return `
+      <div class="insight-row clickable">
+        <div class="insight-tag ${tone.cls}" ${tone.style ? `style="${tone.style}"` : ''}>${tone.label}</div>
+        <div class="insight-text"><strong>${item.title}</strong> ${item.detail}</div>
+      </div>`;
+  }).join('');
+}
+
+// Animated counter (reusable)
+function animCount(el, target, dur = 1800) {
+  const start = performance.now();
+  (function frame(now) {
+    const p = Math.min((now - start) / dur, 1);
+    const ease = 1 - Math.pow(1 - p, 4);
+    el.textContent = fmt(ease * target);
+    if (p < 1) requestAnimationFrame(frame);
+  })(performance.now());
+}
+
+// Animated hero number (splits on decimal)
+function animHeroNumber(intEl, decEl, target, dur = 2200) {
+  const start = performance.now();
+  (function frame(now) {
+    const p = Math.min((now - start) / dur, 1);
+    const ease = 1 - Math.pow(1 - p, 4);
+    const val = ease * target;
+    const parts = val.toFixed(2).split('.');
+    intEl.textContent = fmt(parseFloat(parts[0]));
+    if (decEl) decEl.textContent = parts[1];
+    if (p < 1) requestAnimationFrame(frame);
+  })(performance.now());
+}
+
+// ‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê
+// CURSOR
+// ‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê
+const cur = document.getElementById('cursor');
+const curO = document.getElementById('cursor-outer');
+let mx = 0, my = 0, ox = 0, oy = 0;
+document.addEventListener('mousemove', e => {
+  mx = e.clientX; my = e.clientY;
+  cur.style.transform = `translate(${mx - 4}px,${my - 4}px)`;
+});
+(function loop() {
+  ox += (mx - ox) * 0.12; oy += (my - oy) * 0.12;
+  curO.style.transform = `translate(${ox - 16}px,${oy - 16}px)`;
+  requestAnimationFrame(loop);
+})();
+
+// ‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê
+// CLOCK
+// ‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê
+function tick() {
+  const n = new Date();
+  document.getElementById('clk').textContent =
+    [n.getHours(), n.getMinutes(), n.getSeconds()]
+      .map(v => String(v).padStart(2, '0')).join(':');
+}
+tick(); setInterval(tick, 1000);
+
+// ‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê
+// PAGE ROUTER
+// ‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê
+const PAGES = ['overview','transactions','budgets','goals','analytics'];
+const PAGE_LOADED = {};
+
+function showPage(name) {
+  // Hide all page divs
+  document.querySelectorAll('#content > [data-page]').forEach(el => {
+    el.style.display = 'none';
+  });
+
+  // Show target page
+  const target = document.querySelector(`#content > [data-page="${name}"]`);
+  if (target) target.style.display = 'block';
+
+  // Update topbar section label
+  const label = document.querySelector('.tb-label');
+  if (label) label.textContent = name.charAt(0).toUpperCase() + name.slice(1);
+
+  // Sync topbar tabs
+  document.querySelectorAll('.tn[data-page]').forEach(n => n.classList.remove('on'));
+  const activeTab = document.querySelector(`.tn[data-page="${name}"]`);
+  if (activeTab) activeTab.classList.add('on');
+
+  // Sync sidebar icons
+  document.querySelectorAll('.nav-icon[data-page]').forEach(n => n.classList.remove('active'));
+  const activeIcon = document.querySelector(`.nav-icon[data-page="${name}"]`);
+  if (activeIcon) activeIcon.classList.add('active');
+
+  // Lazy-load page data once per session
+  if (!PAGE_LOADED[name]) {
+    PAGE_LOADED[name] = true;
+    if (name === 'transactions') loadTransactionsPage(0);
+    if (name === 'budgets')      loadBudgetsPage();
+    if (name === 'goals')        loadGoalsPage();
+    if (name === 'analytics')    loadAnalyticsPage();
+  }
+}
+
+// Wire topbar tabs ‚?? read data-page from HTML attribute directly
+document.querySelectorAll('.tn[data-page]').forEach(el => {
+  el.addEventListener('click', () => showPage(el.dataset.page));
+});
+
+// Wire sidebar icons ‚?? read data-page from HTML attribute directly
+document.querySelectorAll('.nav-icon[data-page]').forEach(el => {
+  el.addEventListener('click', () => showPage(el.dataset.page));
+});
+
+// ‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê
+// PAGE: TRANSACTIONS ‚?? paginated full table
+// ‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê
+let txCurrentPage = 0;
+const TX_PAGE_SIZE = 15;
+let txAllData = [];
+let txFiltered = [];
+
+async function loadAccountOptions(force = false) {
+  if (!force && accountCache.length > 0) return accountCache;
+  const raw = await api('/accounts');
+  accountCache = Array.isArray(raw) ? raw : (raw?.accounts ?? raw?.content ?? []);
+  const select = document.getElementById('statementAccount');
+  if (select) {
+    select.innerHTML = accountCache.length
+      ? accountCache.map(acc => `<option value="${acc.id}">${acc.name} ‚?¢ ${acc.type}</option>`).join('')
+      : '<option value="">Create an account via API first</option>';
+  }
+  return accountCache;
+}
+
+async function handleAccountCreate(event) {
+  event.preventDefault();
+  const statusEl = document.getElementById('accountCreateStatus');
+  const submit = document.getElementById('accountCreateSubmit');
+  submit.disabled = true;
+  statusEl.textContent = 'Creating account...';
+  statusEl.className = 'form-status';
+
+  let response = null;
+  try {
+    response = await createAccountFromForm({ showValidation: true });
+  } catch (err) {
+    statusEl.textContent = err.message || 'Account creation failed.';
+    statusEl.className = 'form-status err';
+  }
+
+  submit.disabled = false;
+
+  if (!response?.id) {
+    if (!statusEl.textContent) {
+      statusEl.textContent = 'Account creation failed.';
+      statusEl.className = 'form-status err';
+    }
+    return;
+  }
+
+  statusEl.textContent = `Account created: ${response.name}`;
+  statusEl.className = 'form-status ok';
+  document.getElementById('accountCreateForm')?.reset();
+  await loadAccountOptions(true);
+  const select = document.getElementById('statementAccount');
+  if (select) select.value = String(response.id);
+  await bootstrap();
+}
+
+async function createAccountFromForm(options = {}) {
+  const { showValidation = false } = options;
+  const statusEl = document.getElementById('accountCreateStatus');
+  const name = document.getElementById('accountName')?.value?.trim();
+  const type = document.getElementById('accountType')?.value;
+  const initialBalance = document.getElementById('accountBalance')?.value;
+  const institution = document.getElementById('accountInstitution')?.value?.trim();
+
+  if (!name || !type) {
+    if (showValidation && statusEl) {
+      statusEl.textContent = 'Enter an account name and type first.';
+      statusEl.className = 'form-status err';
+    }
+    return null;
+  }
+
+  const response = await api('/accounts', {
+    method: 'POST',
+    throwOnError: true,
+    body: JSON.stringify({
+      name,
+      type,
+      initialBalance: initialBalance ? Number(initialBalance) : 0,
+      currency: 'INR',
+      institution: institution || null,
+      color: '#c8f000',
+    }),
+  });
+
+  return response;
+}
+
+async function loadStatementHistory() {
+  const list = document.getElementById('statementHistoryList');
+  if (!list) return;
+  list.innerHTML = `<div class="page-loading" style="padding:12px 0">Loading statements<span class="blink">_</span></div>`;
+  const raw = await api('/statements');
+  statementCache = raw?.statements ?? [];
+  if (!statementCache.length) {
+    list.innerHTML = `<div class="page-loading" style="padding:12px 0">No uploads yet</div>`;
+    return;
+  }
+  list.innerHTML = statementCache.slice(0, 6).map(statement => `
+    <div class="mini-item">
+      <div class="mini-label">${statement.source ?? 'CSV Upload'} ‚?¢ ${statement.accountName ?? 'Account'}</div>
+      <div class="mini-value">${statement.fileName ?? 'Statement'}</div>
+      <div class="form-status ok">${statement.transactionCount ?? 0} transactions ‚?¢ ${money(statement.totalIncome ?? 0)} in ‚?¢ ${money(statement.totalExpenses ?? 0)} out</div>
+    </div>
+  `).join('');
+}
+
+async function handleStatementUpload(event) {
+  event.preventDefault();
+  const statusEl = document.getElementById('statementUploadStatus');
+  const submit = document.getElementById('statementUploadSubmit');
+  let accountId = document.getElementById('statementAccount')?.value;
+  const file = document.getElementById('statementFile')?.files?.[0];
+  const statementDateValue = document.getElementById('statementDate')?.value?.trim() || '';
+  if (!file) {
+    statusEl.textContent = 'Choose a CSV or PDF statement first.';
+    statusEl.className = 'form-status err';
+    return;
+  }
+  if (file.size > 50 * 1024 * 1024) {
+    statusEl.textContent = 'Statement file is too large. Keep it under 50MB.';
+    statusEl.className = 'form-status err';
+    return;
+  }
+
+  if (!accountId) {
+    statusEl.textContent = 'No account selected. Creating one from the form above...';
+    statusEl.className = 'form-status';
+    let created = null;
+    try {
+      created = await createAccountFromForm({ showValidation: true });
+    } catch (err) {
+      statusEl.textContent = err.message || 'Account creation failed.';
+      statusEl.className = 'form-status err';
+      return;
+    }
+    if (!created?.id) {
+      statusEl.textContent = 'Create an account first, or fill the new account form so upload can create it automatically.';
+      statusEl.className = 'form-status err';
+      return;
+    }
+    await loadAccountOptions(true);
+    accountId = String(created.id);
+    const select = document.getElementById('statementAccount');
+    if (select) select.value = accountId;
+  }
+
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('accountId', accountId);
+  formData.append('source', document.getElementById('statementSource')?.value || 'CSV Upload');
+  if (statementDateValue) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(statementDateValue)) {
+      statusEl.textContent = 'Statement date must use the calendar picker or the YYYY-MM-DD format.';
+      statusEl.className = 'form-status err';
+      return;
+    }
+    formData.append('statementDate', statementDateValue);
+  }
+  formData.append('applyToAccountBalance', document.getElementById('statementApplyBalance')?.value || 'false');
+
+  statusEl.textContent = 'Uploading and processing statement...';
+  statusEl.className = 'form-status';
+  submit.disabled = true;
+
+  let response = null;
+  try {
+    response = await api('/statements/upload', { method: 'POST', body: formData, throwOnError: true });
+  } catch (err) {
+    submit.disabled = false;
+    statusEl.textContent = err.message === 'Failed to fetch'
+      ? 'Upload could not reach the backend. If this PDF is large, try again now that the limit has been increased, or use a smaller/text-based PDF.'
+      : (err.message || 'Statement upload failed.');
+    statusEl.className = 'form-status err';
+    return;
+  }
+  submit.disabled = false;
+
+  statusEl.textContent = `Imported ${response.importedCount ?? 0} transactions. Skipped ${response.skippedDuplicates ?? 0} duplicates.`;
+  statusEl.className = 'form-status ok';
+  document.getElementById('statementUploadForm')?.reset();
+  await Promise.all([loadStatementHistory(), loadTransactionsPage(0), bootstrap()]);
+}
+
+async function loadTransactionsPage(pageNum) {
+  txCurrentPage = pageNum;
+  const list = document.getElementById('tx-full-list');
+  await loadAccountOptions();
+  await loadStatementHistory();
+
+  // fetch all once, then filter/paginate client-side
+  if (txAllData.length === 0) {
+    list.innerHTML = `<div class="page-loading">Fetching transactions<span class="blink">_</span></div>`;
+    const raw = await api('/transactions?page=0&size=500');
+    if (raw) {
+      txAllData = Array.isArray(raw) ? raw : (raw.content ?? raw.transactions ?? []);
+    }
+    // Also populate category filter
+    const cats = [...new Set(txAllData.map(t => t.category ?? t.categoryName).filter(Boolean))];
+    const catSel = document.getElementById('tx-filter-cat');
+    if (catSel && catSel.options.length <= 1) {
+      cats.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c; opt.textContent = c;
+        catSel.appendChild(opt);
+      });
+    }
+  }
+  renderTxTable();
+}
+
+function renderTxTable() {
+  const search  = document.getElementById('tx-search')?.value?.toLowerCase() ?? '';
+  const typeF   = document.getElementById('tx-filter-type')?.value ?? '';
+  const catF    = document.getElementById('tx-filter-cat')?.value ?? '';
+
+  txFiltered = txAllData.filter(tx => {
+    const matchSearch = !search ||
+      (tx.description ?? tx.name ?? '').toLowerCase().includes(search) ||
+      (tx.category ?? tx.categoryName ?? '').toLowerCase().includes(search);
+    const matchType = !typeF ||
+      (typeF === 'CREDIT' ? (tx.type ?? '').toUpperCase() === 'INCOME' : (tx.type ?? '').toUpperCase() === 'EXPENSE');
+    const matchCat = !catF || (tx.category ?? tx.categoryName) === catF;
+    return matchSearch && matchType && matchCat;
+  });
+
+  const totalPages = Math.max(1, Math.ceil(txFiltered.length / TX_PAGE_SIZE));
+  if (txCurrentPage >= totalPages) txCurrentPage = 0;
+  const slice = txFiltered.slice(txCurrentPage * TX_PAGE_SIZE, (txCurrentPage + 1) * TX_PAGE_SIZE);
+
+  const list = document.getElementById('tx-full-list');
+  if (slice.length === 0) {
+    list.innerHTML = `<div class="page-loading">No transactions found<span class="blink">_</span></div>`;
+  } else {
+    list.innerHTML = slice.map((tx, i) => {
+      const idx    = txCurrentPage * TX_PAGE_SIZE + i + 1;
+      const amount = Math.abs(signedAmount(tx));
+      const cls   = transactionDisplayClass(tx);
+      const sign  = transactionDisplaySign(tx);
+      return `
+      <div class="tx-full-row">
+        <span class="tx-row-num">${idx}</span>
+        <div>
+          <div class="tx-full-name">${tx.description ?? tx.name ?? '‚??'}</div>
+          <div class="tx-full-sub">${tx.notes ?? ''}</div>
+        </div>
+        <span class="tx-full-cat">${tx.category ?? tx.categoryName ?? '‚??'}</span>
+        <span class="tx-full-acc">${tx.accountName ?? tx.account ?? '‚??'}</span>
+        <span class="tx-full-date">${relativeDate(tx.date ?? tx.transactionDate)}</span>
+        <span class="tx-full-amount ${cls}">${sign}‚?π${fmt(Math.abs(amount))}</span>
+      </div>`;
+    }).join('');
+  }
+
+  document.getElementById('tx-page-info').textContent =
+    `PAGE ${txCurrentPage + 1} / ${totalPages}  ¬∑  ${txFiltered.length} TXN`;
+  document.getElementById('tx-prev').disabled = txCurrentPage === 0;
+  document.getElementById('tx-next').disabled = txCurrentPage >= totalPages - 1;
+}
+
+// Pagination buttons
+document.getElementById('tx-prev')?.addEventListener('click', () => { txCurrentPage--; renderTxTable(); });
+document.getElementById('tx-next')?.addEventListener('click', () => { txCurrentPage++; renderTxTable(); });
+
+// Filter controls ‚?? reset to page 0 on any change
+['tx-filter-type','tx-filter-cat'].forEach(id => {
+  document.getElementById(id)?.addEventListener('change', () => { txCurrentPage = 0; renderTxTable(); });
+});
+let txSearchTimer;
+document.getElementById('tx-search')?.addEventListener('input', () => {
+  clearTimeout(txSearchTimer);
+  txSearchTimer = setTimeout(() => { txCurrentPage = 0; renderTxTable(); }, 280);
+});
+document.getElementById('statementUploadForm')?.addEventListener('submit', handleStatementUpload);
+document.getElementById('accountCreateForm')?.addEventListener('submit', handleAccountCreate);
+document.getElementById('statementRefreshBtn')?.addEventListener('click', async () => {
+  txAllData = [];
+  await loadTransactionsPage(0);
+});
+
+// ‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê
+// PAGE: BUDGETS
+// ‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê
+async function loadBudgetsPage() {
+  const listEl = document.getElementById('bud-full-list');
+  const COLORS = ['var(--acid)','var(--ice)','var(--ember)','#b06fff','var(--offwhite)'];
+
+  const raw = await api('/budgets');
+  const budgets = Array.isArray(raw) ? raw : (raw?.content ?? raw?.budgets ?? null);
+
+  if (!budgets || budgets.length === 0) {
+    listEl.innerHTML = `<div class="page-loading" style="padding:48px">No budgets found<span class="blink">_</span></div>`;
+    return;
+  }
+
+  // Summary strip
+  const totalBudget = budgets.reduce((s,b) => s + (b.limit ?? b.totalAmount ?? b.amount ?? 0), 0);
+  const totalSpent  = budgets.reduce((s,b) => s + (b.spent ?? b.usedAmount ?? 0), 0);
+  const overCount   = budgets.filter(b => {
+    const pct = ((b.spent ?? b.usedAmount ?? 0) / (b.limit ?? b.totalAmount ?? 1)) * 100;
+    return pct >= 80;
+  }).length;
+
+  document.getElementById('bud-summary-row').innerHTML = `
+    <div class="stat-cell">
+      <div class="stat-cell-label">Total Budget</div>
+      <div class="stat-cell-val" style="color:var(--offwhite)">‚?π${fmt(totalBudget)}</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-cell-label">Total Spent</div>
+      <div class="stat-cell-val dn">‚?π${fmt(totalSpent)}</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-cell-label">Remaining</div>
+      <div class="stat-cell-val up">‚?π${fmt(totalBudget - totalSpent)}</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-cell-label">Overall Usage</div>
+      <div class="stat-cell-val" style="color:${pctColor(Math.round(totalSpent/totalBudget*100))}">${Math.round(totalSpent/totalBudget*100)}%</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-cell-label">Categories at Risk</div>
+      <div class="stat-cell-val ${overCount > 0 ? 'dn' : 'up'}">${overCount}</div>
+    </div>`;
+
+  // Budget cards
+  listEl.innerHTML = budgets.map((b, i) => {
+    const spent = b.spent ?? b.usedAmount ?? 0;
+    const limit = b.limit ?? b.totalAmount ?? b.amount ?? 1;
+    const pct   = Math.min(Math.round((spent / limit) * 100), 100);
+    const rem   = limit - spent;
+    const color = pctColor(pct);
+    return `
+    <div class="bud-card">
+      <div class="bud-card-name" style="color:${color}">${b.name ?? b.category ?? b.categoryName ?? 'Budget'}</div>
+      <div class="bud-card-nums">‚?π${fmt(spent)} spent of ‚?π${fmt(limit)} limit</div>
+      <div class="bud-card-bar-track">
+        <div class="bud-card-bar-fill" data-w="${pct}" style="background:${color}"></div>
+      </div>
+      <div class="bud-card-footer">
+        <div class="bud-card-pct" style="color:${color}">${pct}<span style="font-size:0.4em;color:var(--muted)">%</span></div>
+        <div class="bud-card-rem">
+          ${pct >= 100 ? '<span class="dn">LIMIT REACHED</span>' : `<span class="${pct>=80?'dn':'up'}">‚?π${fmt(rem)} left</span>`}
+          <br/>${b.period ?? 'This month'}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  setTimeout(() => {
+    document.querySelectorAll('.bud-card-bar-fill').forEach(el => { el.style.width = el.dataset.w + '%'; });
+  }, 100);
+}
+
+// ‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê
+// PAGE: GOALS
+// ‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê
+async function loadGoalsPage() {
+  const listEl = document.getElementById('goals-full-list');
+  const COLORS = ['var(--acid)','var(--ice)','var(--ember)','#b06fff','#ff9500'];
+
+  const profile = await api('/goals');
+  const statusEl = document.getElementById('financialGoalStatus');
+  if (profile) {
+    document.getElementById('goalRent').value = profile.rent ?? '';
+    document.getElementById('goalSavings').value = profile.savingsGoal ?? '';
+    document.getElementById('goalBudget').value = profile.monthlyBudget ?? '';
+    document.getElementById('goalNotes').value = profile.notes ?? '';
+    document.getElementById('goalProfileSummary').innerHTML = `
+      <div class="mini-item"><div class="mini-label">Rent</div><div class="mini-value">${profile.rent != null ? money(profile.rent) : '‚??'}</div></div>
+      <div class="mini-item"><div class="mini-label">Savings Goal</div><div class="mini-value">${profile.savingsGoal != null ? money(profile.savingsGoal) : '‚??'}</div></div>
+      <div class="mini-item"><div class="mini-label">Monthly Budget</div><div class="mini-value">${profile.monthlyBudget != null ? money(profile.monthlyBudget) : '‚??'}</div></div>
+    `;
+    if (statusEl) {
+      statusEl.textContent = 'Financial profile loaded.';
+      statusEl.className = 'form-status ok';
+    }
+  }
+
+  const raw = await api('/savings-goals');
+  const goals = Array.isArray(raw) ? raw : (raw?.content ?? raw?.savingsGoals ?? null);
+
+  if (!goals || goals.length === 0) {
+    listEl.innerHTML = `<div class="page-loading" style="padding:48px">No goals found<span class="blink">_</span></div>`;
+    return;
+  }
+
+  const totalSaved = goals.reduce((s,g) => s + (g.currentAmount ?? g.savedAmount ?? 0), 0);
+  document.getElementById('goals-total-chip').textContent = `Total Saved: ‚?π${fmt(totalSaved)}`;
+
+  listEl.innerHTML = goals.map((g, i) => {
+    const current = g.currentAmount ?? g.savedAmount ?? 0;
+    const target  = g.targetAmount  ?? g.goalAmount  ?? 1;
+    const pct     = Math.min(Math.round((current / target) * 100), 100);
+    const color   = COLORS[i % COLORS.length];
+    const eta     = g.estimatedMonthsLeft != null
+      ? `~${g.estimatedMonthsLeft} months to go`
+      : g.targetDate
+        ? `Target: ${new Date(g.targetDate).toLocaleDateString('en-IN',{month:'short',year:'numeric'})}`
+        : '‚??';
+    return `
+    <div class="goal-card">
+      <div class="goal-card-idx">${String(i+1).padStart(2,'0')}</div>
+      <div class="goal-card-name" style="color:${color}">${g.name ?? g.title ?? 'Goal'}</div>
+      <div class="goal-card-sub">‚?π${fmt(current)} saved of ‚?π${fmt(target)} target</div>
+      <div class="goal-card-bar-track">
+        <div class="goal-card-bar-fill" data-w="${pct}" style="background:${color}"></div>
+      </div>
+      <div class="goal-card-footer">
+        <div class="goal-card-pct" style="color:${color}">${pct}<span style="font-size:0.4em;color:var(--muted)">%</span></div>
+        <div class="goal-card-eta">${eta}</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  setTimeout(() => {
+    document.querySelectorAll('.goal-card-bar-fill').forEach(el => { el.style.width = el.dataset.w + '%'; });
+  }, 100);
+}
+
+document.getElementById('financialGoalForm')?.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const statusEl = document.getElementById('financialGoalStatus');
+  const payload = {
+    rent: document.getElementById('goalRent')?.value ? Number(document.getElementById('goalRent').value) : null,
+    savingsGoal: document.getElementById('goalSavings')?.value ? Number(document.getElementById('goalSavings').value) : null,
+    monthlyBudget: document.getElementById('goalBudget')?.value ? Number(document.getElementById('goalBudget').value) : null,
+    notes: document.getElementById('goalNotes')?.value || ''
+  };
+  const response = await api('/goals', { method: 'POST', body: JSON.stringify(payload) });
+  if (!response) {
+    statusEl.textContent = 'Unable to save financial profile.';
+    statusEl.className = 'form-status err';
+    return;
+  }
+  statusEl.textContent = 'Financial profile saved.';
+  statusEl.className = 'form-status ok';
+  PAGE_LOADED.analytics = false;
+  await loadGoalsPage();
+});
+document.getElementById('goalReloadBtn')?.addEventListener('click', () => loadGoalsPage());
+
+// ‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê
+// PAGE: ANALYTICS
+// ‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê
+async function loadAnalyticsPage() {
+  const [dashboard, recurring, categories] = await Promise.all([
+    api('/analytics/dashboard'),
+    api('/recurring-transactions'),
+    api('/categories'),
+  ]);
+
+  // ‚??‚?? KPIs ‚??‚??
+  const d = dashboard ?? {};
+  const income   = d.monthlyIncome   ?? d.currentMonthIncome   ?? 0;
+  const expenses = d.monthlyExpenses ?? d.currentMonthExpenses ?? 0;
+  const savings  = d.monthlySavings  ?? (income - expenses)    ?? 0;
+  const rate     = income > 0 ? ((savings / income) * 100).toFixed(1) : '‚??';
+  const netWorth = d.totalNetWorth   ?? d.netWorth             ?? 0;
+
+  document.getElementById('analytics-kpis').innerHTML = `
+    <div class="stat-cell">
+      <div class="stat-cell-label">Statement Income</div>
+      <div class="stat-cell-val up">‚?π${fmt(income)}</div>
+      <div class="stat-cell-delta up">${d.incomeChangePercent != null ? (d.incomeChangePercent>=0?'+':'')+d.incomeChangePercent.toFixed(1)+'% MoM' : ''}</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-cell-label">Statement Expenses</div>
+      <div class="stat-cell-val dn">‚?π${fmt(expenses)}</div>
+      <div class="stat-cell-delta dn">${d.expenseChangePercent != null ? (d.expenseChangePercent>=0?'+':'')+d.expenseChangePercent.toFixed(1)+'% MoM' : ''}</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-cell-label">Net Flow</div>
+      <div class="stat-cell-val" style="color:var(--offwhite)">‚?π${fmt(savings)}</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-cell-label">Savings Rate</div>
+      <div class="stat-cell-val up">${rate}%</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-cell-label">Net Worth</div>
+      <div class="stat-cell-val" style="color:var(--acid)">‚?π${fmt(netWorth)}</div>
+    </div>`;
+
+  // ‚??‚?? Chart (reuse renderChart but target analytics svg) ‚??‚??
+  function renderAnalyticsChart(data) {
+    const svg = document.getElementById('analyticsChartSvg');
+    const W=820, H=260, PL=48, PR=12, PT=8, PB=32;
+    const cW=W-PL-PR, cH=H-PT-PB;
+    let mo, inc, exp;
+    if (data?.monthlyData?.length > 0) {
+      mo  = data.monthlyData.map(d => (d.month||'').toString().slice(0,3).toUpperCase());
+      inc = data.monthlyData.map(d => (d.income||0)/1000);
+      exp = data.monthlyData.map(d => (d.expenses||0)/1000);
+    } else {
+      mo  = ['APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC','JAN','FEB','MAR'];
+      inc = [95,98,102,115,108,112,120,118,125,130,136,142];
+      exp = [72,68,74,88,79,82,91,85,89,94,90,93.5];
+    }
+    const net = inc.map((v,i)=>+(v-exp[i]).toFixed(1));
+    const all = [...inc,...exp,...net];
+    const mn=Math.min(...all)*0.82, mx2=Math.max(...all)*1.06;
+    const xp=i=>PL+(i/(mo.length-1))*cW;
+    const yp=v=>PT+cH-((v-mn)/(mx2-mn))*cH;
+    const pt=d=>d.map((v,i)=>`${i?'L':'M'}${xp(i).toFixed(1)},${yp(v).toFixed(1)}`).join(' ');
+    const ar=d=>{const b=PT+cH;return `${pt(d)} L${xp(d.length-1).toFixed(1)},${b} L${xp(0).toFixed(1)},${b} Z`;};
+    const last=mo.length-1;
+    svg.innerHTML=`<defs>
+      <linearGradient id="agA" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#c8f000" stop-opacity="0.14"/><stop offset="100%" stop-color="#c8f000" stop-opacity="0"/></linearGradient>
+      <linearGradient id="agB" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#ff4d00" stop-opacity="0.1"/><stop offset="100%" stop-color="#ff4d00" stop-opacity="0"/></linearGradient>
+      <filter id="agf"><feGaussianBlur stdDeviation="2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    </defs>
+    ${[0,.25,.5,.75,1].map(t=>{const y=PT+t*cH,v=mx2-t*(mx2-mn);return`<line x1="${PL}" y1="${y.toFixed(1)}" x2="${W-PR}" y2="${y.toFixed(1)}" stroke="rgba(255,255,255,0.04)" stroke-width="1"/><text x="${PL-6}" y="${(y+3).toFixed(1)}" text-anchor="end" font-family="IBM Plex Mono" font-size="8" fill="#3a3a36">${v.toFixed(0)}K</text>`;}).join('')}
+    ${mo.map((m,i)=>`<text x="${xp(i).toFixed(1)}" y="${H-5}" text-anchor="middle" font-family="IBM Plex Mono" font-size="8" fill="#3a3a36">${m}</text>`).join('')}
+    <path d="${ar(inc)}" fill="url(#agA)"/>
+    <path d="${ar(exp)}" fill="url(#agB)"/>
+    <path d="${pt(net)}" fill="none" stroke="rgba(232,228,220,0.2)" stroke-width="1" stroke-dasharray="3 3"/>
+    <path id="aeL" d="${pt(exp)}" fill="none" stroke="#ff4d00" stroke-width="1.5" filter="url(#agf)"/>
+    <path id="aiL" d="${pt(inc)}" fill="none" stroke="#c8f000" stroke-width="2" filter="url(#agf)"/>
+    <circle cx="${xp(last).toFixed(1)}" cy="${yp(inc[last]).toFixed(1)}" r="4" fill="#c8f000" style="filter:drop-shadow(0 0 6px #c8f000)"/>
+    <circle cx="${xp(last).toFixed(1)}" cy="${yp(exp[last]).toFixed(1)}" r="3" fill="#ff4d00" style="filter:drop-shadow(0 0 6px #ff4d00)"/>`;
+    ['aiL','aeL'].forEach((id,i)=>{
+      const el=svg.querySelector('#'+id); if(!el) return;
+      const len=el.getTotalLength();
+      el.style.strokeDasharray=len; el.style.strokeDashoffset=len;
+      setTimeout(()=>{ el.style.transition='stroke-dashoffset 2s cubic-bezier(0.22,1,0.36,1)'; el.style.strokeDashoffset='0'; },300+i*300);
+    });
+  }
+  renderAnalyticsChart(dashboard);
+
+  // ‚??‚?? Category donut ‚??‚??
+  const catData = (Array.isArray(categories) ? categories : categories?.categories ?? null)
+    ?.filter(c => (c.totalSpent ?? c.amount ?? 0) > 0)
+    ?.sort((a,b) => (b.totalSpent??b.amount??0) - (a.totalSpent??a.amount??0))
+    ?.slice(0, 6);
+
+  if (catData && catData.length > 0) {
+    const CAT_COLORS = ['var(--acid)','var(--ice)','var(--ember)','#b06fff','#ff9500','var(--offwhite)'];
+    const totalExp = catData.reduce((s,c) => s + (c.totalSpent??c.amount??0), 0);
+
+    // Donut
+    const dsvg = document.getElementById('analyticsDonut');
+    while(dsvg.firstChild) dsvg.removeChild(dsvg.firstChild);
+    const cx=80,cy=80,r=58,sw=12,circ=2*Math.PI*r;
+    const bgc = document.createElementNS('http://www.w3.org/2000/svg','circle');
+    bgc.setAttribute('cx',cx); bgc.setAttribute('cy',cy);
+    bgc.setAttribute('r',r-sw/2-8); bgc.setAttribute('fill','#131310');
+    dsvg.appendChild(bgc);
+    let off=0;
+    catData.forEach((c,i)=>{
+      const p=(c.totalSpent??c.amount??0)/totalExp;
+      const el=document.createElementNS('http://www.w3.org/2000/svg','circle');
+      el.setAttribute('cx',cx);el.setAttribute('cy',cy);el.setAttribute('r',r);
+      el.setAttribute('fill','none');el.setAttribute('stroke',CAT_COLORS[i]);el.setAttribute('stroke-width',sw);
+      const dash=p*circ;
+      el.setAttribute('stroke-dasharray',`${dash} ${circ-dash}`);
+      el.setAttribute('stroke-dashoffset',-off*circ);
+      el.style.transform='rotate(-90deg)'; el.style.transformOrigin=`${cx}px ${cy}px`;
+      dsvg.appendChild(el); off+=p;
+    });
+    document.getElementById('analytics-donut-center').textContent = `‚?π${fmt(totalExp)}`;
+
+    // Legend
+    document.getElementById('analytics-cat-legend').innerHTML = catData.map((c,i) => `
+    <div class="dl-item">
+      <div class="dl-left"><div class="dl-dot" style="background:${CAT_COLORS[i]}"></div>${c.name??c.category??'Other'}</div>
+      <div class="dl-val" style="color:${CAT_COLORS[i]}">‚?π${fmt(c.totalSpent??c.amount??0)}</div>
+    </div>`).join('');
+  }
+
+  // ‚??‚?? Recurring transactions ‚??‚??
+  const recEl = document.getElementById('recurring-list');
+  const recData = Array.isArray(recurring) ? recurring : (recurring?.content ?? recurring?.recurringTransactions ?? null);
+  if (!recData || recData.length === 0) {
+    recEl.innerHTML = `<div class="page-loading">No recurring transactions found</div>`;
+  } else {
+    recEl.innerHTML = `
+    <div class="rec-row" style="border-bottom:1px solid var(--line);padding-bottom:10px;margin-bottom:4px">
+      <span style="font-family:var(--font-mono);font-size:8px;letter-spacing:0.2em;color:var(--muted);text-transform:uppercase">Description</span>
+      <span style="font-family:var(--font-mono);font-size:8px;letter-spacing:0.2em;color:var(--muted);text-transform:uppercase">Frequency</span>
+      <span style="font-family:var(--font-mono);font-size:8px;letter-spacing:0.2em;color:var(--muted);text-transform:uppercase">Next Due</span>
+      <span style="font-family:var(--font-mono);font-size:8px;letter-spacing:0.2em;color:var(--muted);text-transform:uppercase;text-align:right">Amount</span>
+    </div>
+    ` + recData.map(r => {
+      const amount = r.amount ?? 0;
+      const isCredit = amount >= 0;
+      return `
+      <div class="rec-row">
+        <div>
+          <div class="rec-name">${r.description ?? r.name ?? '‚??'}</div>
+          <div class="rec-sub">${r.category ?? r.categoryName ?? '‚??'}</div>
+        </div>
+        <span class="rec-freq">${r.frequency ?? r.recurrenceType ?? '‚??'}</span>
+        <span class="rec-next">${r.nextDueDate ? relativeDate(r.nextDueDate) : '‚??'}</span>
+        <span class="rec-amount ${isCredit?'up':'dn'}">${isCredit?'+':'‚??'}‚?π${fmt(Math.abs(amount))}</span>
+      </div>`;
+    }).join('');
+  }
+}
+
+// ‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê
+// PANEL TILT
+// ‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê
+document.querySelectorAll('.panel').forEach(p => {
+  p.addEventListener('mousemove', e => {
+    const r = p.getBoundingClientRect();
+    const x = (e.clientX - r.left) / r.width - 0.5;
+    const y = (e.clientY - r.top) / r.height - 0.5;
+    p.style.transform = `perspective(1200px) rotateX(${-y * 2}deg) rotateY(${x * 2}deg)`;
+  });
+  p.addEventListener('mouseleave', () => { p.style.transform = ''; });
+});
+
+// ‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê
+// CHART RENDERER (income / expenses / net)
+// Accepts arrays of { month, income, expenses } or
+// falls back to the original static data.
+// ‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê
+function renderChart(data) {
+  const svg = document.getElementById('chartSvg');
+  const W = 680, H = 220, PL = 44, PR = 12, PT = 8, PB = 32;
+  const cW = W - PL - PR, cH = H - PT - PB;
+
+  // If API returned monthly breakdown, use it; else keep static fallback
+  let mo, inc, exp;
+  const trend = data?.monthlyTrend || data?.monthlyData;
+  if (data && Array.isArray(trend) && trend.length > 0) {
+    mo  = trend.map(d => d.month ? d.month.toString().slice(5, 7) : '‚??')
+      .map(m => {
+        const map = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+        return map[Math.max(0, Number(m) - 1)] || '‚??';
+      });
+    inc = trend.map(d => Number(d.income || 0) / 1000);
+    exp = trend.map(d => Number(d.expenses || 0) / 1000);
+  } else {
+    mo  = ['APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC','JAN','FEB','MAR'];
+    inc = [95, 98, 102, 115, 108, 112, 120, 118, 125, 130, 136, 142];
+    exp = [72, 68,  74,  88,  79,  82,  91,  85,  89,  94,  90,  93.5];
+  }
+  const net = inc.map((v, i) => +(v - exp[i]).toFixed(1));
+  const all = [...inc, ...exp, ...net];
+  const mn = Math.min(...all) * 0.82, mx2 = Math.max(...all) * 1.06;
+  const xp = i => PL + (i / (mo.length - 1)) * cW;
+  const yp = v => PT + cH - ((v - mn) / (mx2 - mn)) * cH;
+  const pt = d => d.map((v, i) => `${i ? 'L' : 'M'}${xp(i).toFixed(1)},${yp(v).toFixed(1)}`).join(' ');
+  const ar = d => { const b = PT + cH; return `${pt(d)} L${xp(d.length-1).toFixed(1)},${b} L${xp(0).toFixed(1)},${b} Z`; };
+
+  const last = mo.length - 1;
+  svg.innerHTML = `
+  <defs>
+    <linearGradient id="gA" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#c8f000" stop-opacity="0.14"/>
+      <stop offset="100%" stop-color="#c8f000" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="gB" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ff4d00" stop-opacity="0.1"/>
+      <stop offset="100%" stop-color="#ff4d00" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="gf"><feGaussianBlur stdDeviation="2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  </defs>
+  ${[0,.25,.5,.75,1].map(t => {
+    const y = PT + t * cH, v = mx2 - t * (mx2 - mn);
+    return `<line x1="${PL}" y1="${y.toFixed(1)}" x2="${W-PR}" y2="${y.toFixed(1)}" stroke="rgba(255,255,255,0.04)" stroke-width="1"/>
+    <text x="${PL-6}" y="${(y+3).toFixed(1)}" text-anchor="end" font-family="IBM Plex Mono" font-size="8" fill="#3a3a36">${v.toFixed(0)}K</text>`;
+  }).join('')}
+  ${mo.map((m, i) => `<text x="${xp(i).toFixed(1)}" y="${H-5}" text-anchor="middle" font-family="IBM Plex Mono" font-size="8" fill="#3a3a36">${m}</text>`).join('')}
+  <path d="${ar(inc)}" fill="url(#gA)"/>
+  <path d="${ar(exp)}" fill="url(#gB)"/>
+  <path d="${pt(net)}" fill="none" stroke="rgba(232,228,220,0.2)" stroke-width="1" stroke-dasharray="3 3"/>
+  <path id="eL" d="${pt(exp)}" fill="none" stroke="#ff4d00" stroke-width="1.5" filter="url(#gf)"/>
+  <path id="iL" d="${pt(inc)}" fill="none" stroke="#c8f000" stroke-width="2" filter="url(#gf)"/>
+  <circle cx="${xp(last).toFixed(1)}" cy="${yp(inc[last]).toFixed(1)}" r="4" fill="#c8f000" style="filter:drop-shadow(0 0 6px #c8f000)"/>
+  <circle cx="${xp(last).toFixed(1)}" cy="${yp(exp[last]).toFixed(1)}" r="3" fill="#ff4d00" style="filter:drop-shadow(0 0 6px #ff4d00)"/>
+  <text x="${(xp(last)+8).toFixed(1)}" y="${(yp(inc[last])+3).toFixed(1)}" font-family="Barlow Condensed" font-size="13" font-weight="700" fill="#c8f000">${inc[last].toFixed(0)}K</text>
+  <text x="${(xp(last)+8).toFixed(1)}" y="${(yp(exp[last])+3).toFixed(1)}" font-family="Barlow Condensed" font-size="13" font-weight="700" fill="#ff4d00">${exp[last].toFixed(0)}K</text>`;
+
+  ['iL','eL'].forEach((id, i) => {
+    const el = svg.querySelector('#' + id);
+    if (!el) return;
+    const len = el.getTotalLength();
+    el.style.strokeDasharray = len; el.style.strokeDashoffset = len;
+    setTimeout(() => {
+      el.style.transition = 'stroke-dashoffset 2.4s cubic-bezier(0.22,1,0.36,1)';
+      el.style.strokeDashoffset = '0';
+    }, 600 + i * 350);
+  });
+}
+
+// ‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê
+// DONUT RENDERER
+// Accepts array of { label, value, color }
+// ‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê
+function renderDonut(segments) {
+  const svg = document.getElementById('donut');
+  // Clear existing circles (keep any injected by previous calls)
+  while (svg.firstChild) svg.removeChild(svg.firstChild);
+
+  const cx = 65, cy = 65, r = 48, sw = 10, circ = 2 * Math.PI * r;
+  const total = segments.reduce((s, seg) => s + seg.value, 0);
+
+  // Background ring
+  const bg = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+  bg.setAttribute('cx', cx); bg.setAttribute('cy', cy);
+  bg.setAttribute('r', r - sw / 2 - 8); bg.setAttribute('fill', '#131310');
+  svg.appendChild(bg);
+
+  let off = 0;
+  segments.forEach(seg => {
+    const p = total > 0 ? seg.value / total : 0;
+    const el = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    el.setAttribute('cx', cx); el.setAttribute('cy', cy); el.setAttribute('r', r);
+    el.setAttribute('fill', 'none'); el.setAttribute('stroke', seg.color); el.setAttribute('stroke-width', sw);
+    const dash = p * circ;
+    el.setAttribute('stroke-dasharray', `${dash} ${circ - dash}`);
+    el.setAttribute('stroke-dashoffset', -off * circ);
+    el.style.transform = 'rotate(-90deg)';
+    el.style.transformOrigin = `${cx}px ${cy}px`;
+    el.style.filter = `drop-shadow(0 0 4px ${seg.color}60)`;
+    svg.appendChild(el);
+    off += p;
+  });
+}
+
+// ‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê
+// SECTION RENDERERS
+// ‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê
+
+// ‚??‚?? HERO / DASHBOARD SUMMARY ‚??‚??
+function applyDashboard(d) {
+  if (!d) return; // keep static values if API down
+
+  const heroInt = document.getElementById('hero-int');
+  const heroDec = document.getElementById('hero-dec');
+  const netWorth = d.totalNetWorth ?? d.netWorth ?? d.totalBalance ?? 1245230;
+  animHeroNumber(heroInt, heroDec, netWorth);
+
+  // Stats row counters
+  const income   = d.totalIncome ?? d.monthlyIncome ?? d.currentMonthIncome ?? 142000;
+  const expenses = d.totalExpenses ?? d.monthlyExpenses ?? d.currentMonthExpenses ?? 93500;
+  const saved    = d.netSavings ?? d.monthlySavings ?? (income - expenses) ?? 48500;
+
+  const mcEls = document.querySelectorAll('.mc');
+  const targets = [income, expenses, saved];
+  mcEls.forEach((el, i) => { if (targets[i] != null) animCount(el, targets[i]); });
+
+  // Deltas
+  const deltaEls = document.querySelectorAll('.hs-delta');
+  if (d.incomeChangePercent  != null && deltaEls[0]) {
+    const v = d.incomeChangePercent;
+    deltaEls[0].className = `hs-delta ${deltaClass(v)}`;
+    deltaEls[0].textContent = `${v >= 0 ? '+' : ''}${v.toFixed(1)}% vs last month`;
+  }
+  if (d.expenseChangePercent != null && deltaEls[1]) {
+    const v = d.expenseChangePercent;
+    deltaEls[1].className = `hs-delta ${deltaClass(-v)}`; // expense up = bad
+    deltaEls[1].textContent = `${v >= 0 ? '+' : ''}${v.toFixed(1)}% vs last month`;
+  }
+  if (d.savingsRate != null && deltaEls[2]) {
+    deltaEls[2].textContent = `${d.savingsRate.toFixed(1)}% savings rate`;
+  }
+
+  // Badge
+  const badge = document.querySelector('.badge-delta');
+  if (badge && d.netWorthChangePercent != null) {
+    const v = d.netWorthChangePercent;
+    badge.className = `badge-delta ${deltaClass(v)}`;
+    badge.textContent = `${v >= 0 ? '+' : ''}${v.toFixed(1)}% THIS MONTH`;
+  }
+}
+
+// ‚??‚?? TRANSACTIONS ‚??‚??
+function renderTransactions(txList) {
+  const container = document.querySelector('.panel .tx-header')?.parentElement;
+  if (!container) return;
+
+  container.querySelectorAll('.tx-row, .page-loading').forEach(el => el.remove());
+
+  if (!txList || !txList.length) {
+    const header = container.querySelector('.tx-header');
+    header?.insertAdjacentHTML('afterend', `<div class="page-loading" style="padding:18px 0">No imported transactions yet<span class="blink">_</span></div>`);
+    return;
+  }
+
+  const header = container.querySelector('.tx-header');
+  const rows = txList.slice(0, 8).map(tx => {
+    const amount = tx.amount ?? 0;
+    const isCredit = amount >= 0;
+    const cls = isCredit ? 'up' : 'dn';
+    const sign = isCredit ? '+' : '‚??';
+    const absAmt = Math.abs(amount);
+    return `
+    <div class="tx-row clickable" data-id="${tx.id ?? ''}">
+      <div>
+        <div class="tx-name">${tx.description ?? tx.name ?? 'Transaction'}</div>
+        <div class="tx-cat">${tx.category ?? tx.categoryName ?? '‚??'} ¬∑ ${tx.accountName ?? ''}</div>
+      </div>
+      <div class="tx-date">${relativeDate(tx.date ?? tx.transactionDate)}</div>
+      <div class="tx-amount ${cls}">${sign}‚?π${fmt(absAmt)}</div>
+    </div>`;
+  }).join('');
+
+  header.insertAdjacentHTML('afterend', rows);
+
+  // Re-apply GSAP stagger on new rows
+  if (window.gsap) {
+    gsap.from('.tx-row', { x: -16, opacity: 0, duration: 0.4, stagger: 0.06, ease: 'power2.out' });
+  }
+}
+
+// ‚??‚?? BUDGETS ‚??‚??
+function renderBudgets(budgets) {
+  const panel = document.querySelector('.bud-row')?.closest('.panel');
+  if (!panel) return;
+
+  panel.querySelectorAll('.bud-row, .page-loading').forEach(el => el.remove());
+
+  const fallbackRows = deriveBudgetRowsFromCategories(window.__fintrackDashboardTopCategories || []);
+  const sourceRows = (budgets && budgets.length) ? budgets : fallbackRows;
+  if (!sourceRows.length) {
+    const title = panel.querySelector('.panel-title');
+    title?.insertAdjacentHTML('afterend', `<div class="page-loading" style="padding:18px 0">No budgets configured yet<span class="blink">_</span></div>`);
+    return;
+  }
+
+  const COLORS = ['var(--acid)', 'var(--ember)', 'var(--ice)', 'var(--offwhite)', '#b06fff'];
+
+  const rows = sourceRows.map((b, i) => {
+    const spent  = Number(b.spent ?? b.usedAmount ?? b.totalSpent ?? b.amount ?? 0);
+    const limit  = Number((b.limit ?? b.totalAmount ?? b.amount ?? spent) || 1);
+    const pct    = Math.min(Math.round(b.percentUsed ?? ((spent / Math.max(limit, 1)) * 100)), 100);
+    const rem    = limit - spent;
+    const color  = pctColor(pct);
+    const statusCls = pct >= 80 ? 'dn' : 'up';
+    const statusMsg = pct >= 100
+      ? 'LIMIT REACHED'
+      : `${pct}% used ‚?? ‚?π${fmt(rem)} remaining`;
+
+    return `
+    <div class="bud-row">
+      <div class="bud-meta">
+        <span class="bud-name">${b.name ?? b.category ?? b.categoryName ?? 'Budget'}</span>
+        <span class="bud-nums">‚?π${fmt(spent)} / ‚?π${fmt(limit)}</span>
+      </div>
+      <div class="bud-track">
+        <div class="bud-fill" data-w="${pct}" style="background:${color};animation-delay:${i*0.25}s;width:0%"></div>
+      </div>
+      <div class="bud-status ${statusCls}">${statusMsg}</div>
+    </div>`;
+  }).join('');
+
+  // Insert before the panel title or at end
+  const title = panel.querySelector('.panel-title');
+  title ? title.insertAdjacentHTML('afterend', rows) : panel.insertAdjacentHTML('beforeend', rows);
+
+  // Trigger bar animations
+  setTimeout(() => {
+    panel.querySelectorAll('.bud-fill').forEach(el => { el.style.width = el.dataset.w + '%'; });
+  }, 300);
+}
+
+// ‚??‚?? SAVINGS GOALS ‚??‚??
+function renderGoals(goals) {
+  const panel = document.querySelector('.goal-row')?.closest('.panel');
+  if (!panel) return;
+
+  panel.querySelectorAll('.goal-row, .page-loading').forEach(el => el.remove());
+
+  let sourceGoals = Array.isArray(goals) ? goals : [];
+  if (!sourceGoals.length && window.__fintrackFinancialProfile) {
+    const profile = window.__fintrackFinancialProfile;
+    sourceGoals = [
+      profile.savingsGoal ? {
+        id: 'profile-savings-goal',
+        name: 'Savings Goal',
+        currentAmount: profile.currentSavings ?? 0,
+        targetAmount: profile.savingsGoal,
+      } : null,
+      profile.monthlyBudget ? {
+        id: 'profile-monthly-budget',
+        name: 'Monthly Budget',
+        currentAmount: Math.max(Number(window.__fintrackCurrentExpenses || 0), 0),
+        targetAmount: profile.monthlyBudget,
+      } : null,
+    ].filter(Boolean);
+  }
+
+  if (!sourceGoals.length) {
+    const title = panel.querySelector('.panel-title');
+    title?.insertAdjacentHTML('afterend', `<div class="page-loading" style="padding:18px 0">No savings goals configured yet<span class="blink">_</span></div>`);
+    return;
+  }
+
+  const COLORS = ['var(--acid)', 'var(--ember)', 'var(--ice)', '#b06fff', 'var(--offwhite)'];
+
+  const rows = sourceGoals.map((g, i) => {
+    const current = g.currentAmount ?? g.savedAmount  ?? 0;
+    const target  = g.targetAmount  ?? g.goalAmount   ?? 1;
+    const pct     = Math.min(Math.round((current / target) * 100), 100);
+    const color   = COLORS[i % COLORS.length];
+    const eta     = g.estimatedMonthsLeft != null
+      ? `~${g.estimatedMonthsLeft} months left`
+      : g.targetDate ? `Target: ${new Date(g.targetDate).toLocaleDateString('en-IN',{month:'short',year:'numeric'})}` : '‚??';
+
+    return `
+    <div class="goal-row clickable" data-id="${g.id ?? ''}">
+      <div class="goal-index">${String(i + 1).padStart(2, '0')}</div>
+      <div class="goal-body">
+        <div class="goal-name">${g.name ?? g.title ?? 'Goal'}</div>
+        <div class="goal-bar-track">
+          <div class="goal-bar-fill" data-w="${pct}" style="background:${color};width:0%"></div>
+        </div>
+      </div>
+      <div class="goal-right">
+        <div class="goal-pct" style="color:${color}">${pct}%</div>
+        <div class="goal-eta">${eta}</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  const title = panel.querySelector('.panel-title');
+  title ? title.insertAdjacentHTML('afterend', rows) : panel.insertAdjacentHTML('beforeend', rows);
+
+  setTimeout(() => {
+    panel.querySelectorAll('.goal-bar-fill').forEach(el => { el.style.width = el.dataset.w + '%'; });
+  }, 300);
+}
+
+// ‚??‚?? ACCOUNTS + DONUT ‚??‚??
+function renderAccounts(accounts) {
+  if (!accounts || !accounts.length) return;
+
+  const COLORS = ['var(--acid)', 'var(--ice)', 'var(--ember)', '#b06fff', 'var(--offwhite)'];
+  const total = accounts.reduce((s, a) => s + (a.balance ?? 0), 0);
+
+  // Update donut center
+  const donutBig = document.querySelector('.donut-big');
+  if (donutBig) donutBig.textContent = `‚?π${(total / 100000).toFixed(1)}L`;
+
+  // Rebuild donut segments
+  const segments = accounts.map((a, i) => ({
+    label: a.name ?? a.accountName ?? 'Account',
+    value: a.balance ?? 0,
+    color: COLORS[i % COLORS.length],
+  }));
+  renderDonut(segments);
+
+  // Rebuild donut legend
+  const legend = document.querySelector('.donut-legend');
+  if (legend) {
+    legend.innerHTML = segments.map(s => `
+    <div class="dl-item">
+      <div class="dl-left"><div class="dl-dot" style="background:${s.color}"></div>${s.label}</div>
+      <div class="dl-val" style="color:${s.color}">‚?π${(s.value/100000).toFixed(2)}L</div>
+    </div>`).join('');
+  }
+
+  // Rebuild account rows list
+  const listContainer = document.querySelector('.account-row')?.parentElement;
+  if (listContainer) {
+    listContainer.querySelectorAll('.account-row').forEach(el => el.remove());
+    const rows = accounts.map((a, i) => {
+      const color = COLORS[i % COLORS.length];
+      return `
+      <div class="account-row">
+        <div class="acc-left">
+          <div class="acc-dot" style="background:${color};box-shadow:0 0 6px ${color}"></div>
+          <div>
+            <div class="acc-name">${a.name ?? a.accountName ?? 'Account'}</div>
+            <div class="acc-type">${a.type ?? a.accountType ?? '‚??'}</div>
+          </div>
+        </div>
+        <div class="acc-val" style="color:${color}">‚?π${fmt(a.balance ?? 0)}</div>
+      </div>`;
+    }).join('');
+    listContainer.insertAdjacentHTML('beforeend', rows);
+  }
+
+  // Rebuild ticker with real account data
+  renderTicker(accounts);
+}
+
+// ‚??‚?? TICKER ‚??‚??
+function renderTicker(accounts) {
+  const track = document.querySelector('.ticker-track');
+  if (!track || !accounts || !accounts.length) return;
+
+  const COLORS = ['var(--acid)', 'var(--ice)', 'var(--ember)', '#b06fff'];
+  const items = accounts.map((a, i) => {
+    const color = COLORS[i % COLORS.length];
+    const cls   = (a.balance ?? 0) >= 0 ? 'up' : 'dn';
+    return `<div class="tick">
+      <span class="tick-name">${a.name ?? a.accountName}</span>
+      <span class="tick-val ${cls}" style="color:${color}">‚?π${fmt(a.balance ?? 0)}</span>
+    </div>`;
+  });
+
+  // Duplicate for seamless scroll
+  const html = [...items, ...items].join('');
+  track.innerHTML = html;
+}
+
+function renderTransactions(txList) {
+  const container = document.querySelector('.panel .tx-header')?.parentElement;
+  if (!container) return;
+
+  container.querySelectorAll('.tx-row, .page-loading').forEach(el => el.remove());
+
+  if (!txList || !txList.length) {
+    const header = container.querySelector('.tx-header');
+    header?.insertAdjacentHTML('afterend', `<div class="page-loading" style="padding:18px 0">No imported transactions yet<span class="blink">_</span></div>`);
+    return;
+  }
+
+  const header = container.querySelector('.tx-header');
+  const rows = txList.slice(0, 8).map(tx => {
+    const absAmt = Math.abs(signedAmount(tx));
+    const cls = transactionDisplayClass(tx);
+    const sign = transactionDisplaySign(tx);
+    return `
+    <div class="tx-row clickable" data-id="${tx.id ?? ''}">
+      <div>
+        <div class="tx-name">${tx.description ?? tx.name ?? 'Transaction'}</div>
+        <div class="tx-cat">${tx.category ?? tx.categoryName ?? '-'} ${tx.accountName ? '&middot; ' + tx.accountName : ''}</div>
+      </div>
+      <div class="tx-date">${relativeDate(tx.date ?? tx.transactionDate)}</div>
+      <div class="tx-amount ${cls}">${sign}&#8377;${fmt(absAmt)}</div>
+    </div>`;
+  }).join('');
+
+  header.insertAdjacentHTML('afterend', rows);
+
+  if (window.gsap) {
+    gsap.from('.tx-row', { x: -16, opacity: 0, duration: 0.4, stagger: 0.06, ease: 'power2.out' });
+  }
+}
+
+function renderAnalyticsChartCompat(data) {
+  const svg = document.getElementById('analyticsChartSvg');
+  if (!svg) return;
+
+  const W = 820;
+  const H = 260;
+  const PL = 48;
+  const PR = 12;
+  const PT = 8;
+  const PB = 32;
+  const cW = W - PL - PR;
+  const cH = H - PT - PB;
+
+  const trend = Array.isArray(data?.monthlyTrend) ? data.monthlyTrend : (Array.isArray(data?.monthlyData) ? data.monthlyData : []);
+  let months;
+  let income;
+  let expenses;
+
+  if (trend.length > 0) {
+    const trendMap = new Map();
+    trend.forEach(item => {
+      const key = normalizeLabel(item.month, '');
+      if (!key) return;
+      trendMap.set(key, {
+        income: Number(item.income || 0) / 1000,
+        expenses: Number(item.expenses || 0) / 1000,
+      });
+    });
+    const sortedKeys = [...trendMap.keys()].sort();
+    const monthNames = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+    const lastKey = sortedKeys[sortedKeys.length - 1];
+    const [lastYear, lastMonth] = lastKey.split('-').map(Number);
+    const reference = new Date(lastYear, (lastMonth || 1) - 1, 1);
+    months = [];
+    income = [];
+    expenses = [];
+    for (let offset = 11; offset >= 0; offset--) {
+      const date = new Date(reference.getFullYear(), reference.getMonth() - offset, 1);
+      const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      const point = trendMap.get(key) ?? { income: 0, expenses: 0 };
+      months.push(monthNames[date.getMonth()]);
+      income.push(point.income);
+      expenses.push(point.expenses);
+    }
+  } else {
+    months = ['APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC', 'JAN', 'FEB', 'MAR'];
+    income = [95, 98, 102, 115, 108, 112, 120, 118, 125, 130, 136, 142];
+    expenses = [72, 68, 74, 88, 79, 82, 91, 85, 89, 94, 90, 93.5];
+  }
+
+  const net = income.map((val, index) => +(val - expenses[index]).toFixed(1));
+  const all = [...income, ...expenses, ...net];
+  const minVal = Math.min(0, ...all) * 1.05;
+  const maxVal = Math.max(...all, 1) * 1.08;
+  const xp = index => PL + (index / Math.max(months.length - 1, 1)) * cW;
+  const yp = value => PT + cH - ((value - minVal) / Math.max(maxVal - minVal, 1)) * cH;
+  const pathLine = dataset => dataset.map((value, index) => `${index ? 'L' : 'M'}${xp(index).toFixed(1)},${yp(value).toFixed(1)}`).join(' ');
+  const pathArea = dataset => {
+    const baseline = PT + cH;
+    return `${pathLine(dataset)} L${xp(dataset.length - 1).toFixed(1)},${baseline} L${xp(0).toFixed(1)},${baseline} Z`;
+  };
+  const last = months.length - 1;
+
+  svg.innerHTML = `<defs>
+      <linearGradient id="agA" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#c8f000" stop-opacity="0.14"/><stop offset="100%" stop-color="#c8f000" stop-opacity="0"/></linearGradient>
+      <linearGradient id="agB" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#ff4d00" stop-opacity="0.10"/><stop offset="100%" stop-color="#ff4d00" stop-opacity="0"/></linearGradient>
+      <filter id="agf"><feGaussianBlur stdDeviation="2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    </defs>
+    ${[0, 0.25, 0.5, 0.75, 1].map(tick => {
+      const y = PT + tick * cH;
+      const value = maxVal - tick * (maxVal - minVal);
+      return `<line x1="${PL}" y1="${y.toFixed(1)}" x2="${W - PR}" y2="${y.toFixed(1)}" stroke="rgba(255,255,255,0.04)" stroke-width="1"/><text x="${PL - 6}" y="${(y + 3).toFixed(1)}" text-anchor="end" font-family="IBM Plex Mono" font-size="8" fill="#3a3a36">${value.toFixed(0)}K</text>`;
+    }).join('')}
+    ${months.map((month, index) => `<text x="${xp(index).toFixed(1)}" y="${H - 5}" text-anchor="middle" font-family="IBM Plex Mono" font-size="8" fill="#3a3a36">${month}</text>`).join('')}
+    <path d="${pathArea(income)}" fill="url(#agA)"/>
+    <path d="${pathArea(expenses)}" fill="url(#agB)"/>
+    <path d="${pathLine(net)}" fill="none" stroke="rgba(232,228,220,0.2)" stroke-width="1" stroke-dasharray="3 3"/>
+    <path id="aeL" d="${pathLine(expenses)}" fill="none" stroke="#ff4d00" stroke-width="1.5" filter="url(#agf)"/>
+    <path id="aiL" d="${pathLine(income)}" fill="none" stroke="#c8f000" stroke-width="2" filter="url(#agf)"/>
+    <circle cx="${xp(last).toFixed(1)}" cy="${yp(income[last]).toFixed(1)}" r="4" fill="#c8f000" style="filter:drop-shadow(0 0 6px #c8f000)"/>
+    <circle cx="${xp(last).toFixed(1)}" cy="${yp(expenses[last]).toFixed(1)}" r="3" fill="#ff4d00" style="filter:drop-shadow(0 0 6px #ff4d00)"/>`;
+
+  ['aiL', 'aeL'].forEach((id, index) => {
+    const el = svg.querySelector(`#${id}`);
+    if (!el || typeof el.getTotalLength !== 'function') return;
+    const length = el.getTotalLength();
+    el.style.strokeDasharray = length;
+    el.style.strokeDashoffset = length;
+    setTimeout(() => {
+      el.style.transition = 'stroke-dashoffset 2s cubic-bezier(0.22,1,0.36,1)';
+      el.style.strokeDashoffset = '0';
+    }, 300 + index * 240);
+  });
+}
+
+async function loadAnalyticsPage() {
+  const now = new Date();
+  const endDate = now.toISOString().slice(0, 10);
+  const startDate = new Date(now.getFullYear(), now.getMonth() - 11, 1).toISOString().slice(0, 10);
+  const [dashboard, recurring, categories, insights, transactionPage] = await Promise.all([
+    api('/analytics/dashboard'),
+    api('/recurring-transactions'),
+    api(`/analytics/category?startDate=${startDate}&endDate=${endDate}`),
+    api('/insights'),
+    api('/transactions?page=0&size=500'),
+  ]);
+
+  const d = dashboard ?? {};
+  const income = Number(d.totalIncome ?? d.monthlyIncome ?? d.currentMonthIncome ?? 0);
+  const expenses = Number(d.totalExpenses ?? d.monthlyExpenses ?? d.currentMonthExpenses ?? 0);
+  const savings = Number(d.netSavings ?? d.monthlySavings ?? (income - expenses) ?? 0);
+  const rate = income > 0 ? `${((savings / income) * 100).toFixed(1)}%` : '--';
+  const totalBalance = Number(d.totalBalance ?? d.totalNetWorth ?? d.netWorth ?? 0);
+
+  const kpis = document.getElementById('analytics-kpis');
+  if (kpis) {
+    kpis.innerHTML = `
+      <div class="stat-cell">
+        <div class="stat-cell-label">Total Income</div>
+        <div class="stat-cell-val up">${money(income)}</div>
+        <div class="stat-cell-delta up">${d.incomeChangePercent != null ? `${d.incomeChangePercent >= 0 ? '+' : ''}${Number(d.incomeChangePercent).toFixed(1)}% MoM` : ''}</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-cell-label">Total Expenses</div>
+        <div class="stat-cell-val dn">${money(expenses)}</div>
+        <div class="stat-cell-delta dn">${d.expenseChangePercent != null ? `${d.expenseChangePercent >= 0 ? '+' : ''}${Number(d.expenseChangePercent).toFixed(1)}% MoM` : ''}</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-cell-label">Net Savings</div>
+        <div class="stat-cell-val" style="color:var(--offwhite)">${money(savings)}</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-cell-label">Savings Rate</div>
+        <div class="stat-cell-val up">${rate}</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-cell-label">Total Balance</div>
+        <div class="stat-cell-val" style="color:var(--acid)">${money(totalBalance)}</div>
+      </div>`;
+  }
+
+  renderAnalyticsChartCompat(dashboard);
+
+  const categoryData = (Array.isArray(categories) ? categories : (categories?.categories ?? []))
+    .filter(item => Number(item.totalSpent ?? item.amount ?? 0) > 0)
+    .sort((a, b) => Number(b.totalSpent ?? b.amount ?? 0) - Number(a.totalSpent ?? a.amount ?? 0))
+    .slice(0, 6);
+  const categoryColors = ['var(--acid)', 'var(--ice)', 'var(--ember)', '#b06fff', '#ff9500', 'var(--offwhite)'];
+  const donut = document.getElementById('analyticsDonut');
+  const donutCenter = document.getElementById('analytics-donut-center');
+  const legend = document.getElementById('analytics-cat-legend');
+
+  if (donut && donutCenter && legend) {
+    while (donut.firstChild) donut.removeChild(donut.firstChild);
+    if (categoryData.length === 0) {
+      donutCenter.textContent = '--';
+      legend.innerHTML = `<div class="page-loading" style="padding:12px 0">No category data yet</div>`;
+    } else {
+      const cx = 80;
+      const cy = 80;
+      const r = 58;
+      const sw = 12;
+      const circ = 2 * Math.PI * r;
+      const total = categoryData.reduce((sum, item) => sum + Number(item.totalSpent ?? item.amount ?? 0), 0);
+      const bg = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      bg.setAttribute('cx', cx);
+      bg.setAttribute('cy', cy);
+      bg.setAttribute('r', r - sw / 2 - 8);
+      bg.setAttribute('fill', '#131310');
+      donut.appendChild(bg);
+
+      let offset = 0;
+      categoryData.forEach((item, index) => {
+        const value = Number(item.totalSpent ?? item.amount ?? 0);
+        const pct = total > 0 ? value / total : 0;
+        const el = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        el.setAttribute('cx', cx);
+        el.setAttribute('cy', cy);
+        el.setAttribute('r', r);
+        el.setAttribute('fill', 'none');
+        el.setAttribute('stroke', categoryColors[index]);
+        el.setAttribute('stroke-width', sw);
+        el.setAttribute('stroke-dasharray', `${pct * circ} ${circ - pct * circ}`);
+        el.setAttribute('stroke-dashoffset', -offset * circ);
+        el.style.transform = 'rotate(-90deg)';
+        el.style.transformOrigin = `${cx}px ${cy}px`;
+        donut.appendChild(el);
+        offset += pct;
+      });
+
+      donutCenter.textContent = money(total);
+      legend.innerHTML = categoryData.map((item, index) => `
+        <div class="dl-item">
+          <div class="dl-left"><div class="dl-dot" style="background:${categoryColors[index]}"></div>${item.name ?? item.category ?? 'Other'}</div>
+          <div class="dl-val" style="color:${categoryColors[index]}">${money(item.totalSpent ?? item.amount ?? 0)}</div>
+        </div>`).join('');
+    }
+  }
+
+  const recurringList = document.getElementById('recurring-list');
+  const recurringData = Array.isArray(recurring) ? recurring : (recurring?.content ?? recurring?.recurringTransactions ?? []);
+  const txData = Array.isArray(transactionPage) ? transactionPage : (transactionPage?.content ?? transactionPage?.transactions ?? []);
+  const recurringCandidates = recurringData.length ? recurringData : deriveRecurringCandidates(txData);
+  if (recurringList) {
+    if (!recurringCandidates.length) {
+      recurringList.innerHTML = `<div class="page-loading">No repeating merchants detected from imported statements yet</div>`;
+    } else {
+      recurringList.innerHTML = `
+        <div class="rec-row" style="border-bottom:1px solid var(--line);padding-bottom:10px;margin-bottom:4px">
+          <span style="font-family:var(--font-mono);font-size:8px;letter-spacing:0.2em;color:var(--muted);text-transform:uppercase">Description</span>
+          <span style="font-family:var(--font-mono);font-size:8px;letter-spacing:0.2em;color:var(--muted);text-transform:uppercase">Frequency</span>
+          <span style="font-family:var(--font-mono);font-size:8px;letter-spacing:0.2em;color:var(--muted);text-transform:uppercase">Next Due</span>
+          <span style="font-family:var(--font-mono);font-size:8px;letter-spacing:0.2em;color:var(--muted);text-transform:uppercase;text-align:right">Amount</span>
+        </div>
+        ${recurringCandidates.map(item => {
+          const amt = Math.abs(Number(item.amount ?? item.total ?? signedAmount(item) ?? 0));
+          const cls = item.amount != null ? transactionDisplayClass(item) : 'dn';
+          const sign = item.amount != null ? transactionDisplaySign(item) : '-';
+          return `
+            <div class="rec-row">
+              <div>
+                <div class="rec-name">${item.description ?? item.name ?? item.label ?? '-'}</div>
+                <div class="rec-sub">${item.category ?? item.categoryName ?? '-'}${item.count ? ` &middot; ${item.count} matches` : ''}</div>
+              </div>
+              <span class="rec-freq">${item.frequency ?? item.recurrenceType ?? (item.count ? 'Observed' : '-')}</span>
+              <span class="rec-next">${item.nextDueDate ? relativeDate(item.nextDueDate) : (item.lastDate ? relativeDate(item.lastDate) : '-')}</span>
+              <span class="rec-amount ${cls}">${sign}${money(amt)}</span>
+            </div>`;
+        }).join('')}`;
+    }
+  }
+
+  const insightPredictionVal = document.getElementById('insightPredictionVal');
+  const insightPatternsList = document.getElementById('insightPatternsList');
+  const insightAnomalyCount = document.getElementById('insightAnomalyCount');
+  const insightAnomaliesList = document.getElementById('insightAnomaliesList');
+  const insightSavingsPotential = document.getElementById('insightSavingsPotential');
+  const insightRecommendationsList = document.getElementById('insightRecommendationsList');
+
+  if (insightPredictionVal) {
+    insightPredictionVal.textContent = insights?.predictedNextMonthExpense != null
+      ? money(insights.predictedNextMonthExpense)
+      : '--';
+  }
+  if (insightSavingsPotential) {
+    insightSavingsPotential.textContent = insights?.savingsPotential != null
+      ? money(insights.savingsPotential)
+      : '--';
+  }
+  if (insightPatternsList) {
+    const patterns = Array.isArray(insights?.patterns) ? insights.patterns : [];
+    insightPatternsList.innerHTML = patterns.length
+      ? patterns.map(item => `<div class="insight-mini"><strong>${item.title ?? 'Pattern'}:</strong> ${item.detail ?? ''}</div>`).join('')
+      : `<div class="page-loading" style="padding:12px 0">No behavior patterns yet</div>`;
+  }
+  if (insightAnomalyCount) {
+    const anomalies = Array.isArray(insights?.anomalies) ? insights.anomalies : [];
+    insightAnomalyCount.textContent = String(anomalies.length);
+    if (insightAnomaliesList) {
+      insightAnomaliesList.innerHTML = anomalies.length
+        ? anomalies.map(item => `<div class="insight-mini"><strong>${item.description ?? 'Transaction'}:</strong> ${item.reason ?? 'Unusual activity detected'}</div>`).join('')
+        : `<div class="page-loading" style="padding:12px 0">No anomalies detected</div>`;
+    }
+  }
+  if (insightRecommendationsList) {
+    const recommendations = Array.isArray(insights?.recommendations) ? insights.recommendations : [];
+    insightRecommendationsList.innerHTML = recommendations.length
+      ? recommendations.map(item => `<div class="insight-mini"><strong>${item.title ?? 'Recommendation'}:</strong> ${item.detail ?? item.action ?? ''}</div>`).join('')
+      : `<div class="page-loading" style="padding:12px 0">No recommendations yet</div>`;
+  }
+}
+
+// ‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê
+// BOOTSTRAP ‚?? fetch all endpoints in parallel,
+// then render. Each section degrades independently.
+// ‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê
+async function bootstrap() {
+  if (!authState.accessToken) {
+    setConnectionState('Demo Mode', 'var(--ember)');
+    showAuthModal('login');
+    return;
+  }
+
+  // Kick off all requests at once ‚?? no waterfalling
+  const [dashboard, transactions, budgets, goals, accounts, insights, financialProfile] = await Promise.all([
+    api('/analytics/dashboard'),
+    api('/transactions?page=0&size=8'),
+    api('/budgets'),
+    api('/savings-goals'),
+    api('/accounts'),
+    api('/insights'),
+    api('/goals'),
+  ]);
+
+  window.__fintrackDashboardTopCategories = Array.isArray(dashboard?.topCategories) ? dashboard.topCategories : [];
+  window.__fintrackFinancialProfile = financialProfile ?? null;
+  window.__fintrackCurrentExpenses = Number(dashboard?.totalExpenses ?? dashboard?.monthlyExpenses ?? dashboard?.currentMonthExpenses ?? 0);
+
+  // Apply data to each section
+  applyDashboard(dashboard);
+  renderChart(dashboard);
+  renderTransactions(
+    // API might return { content: [...] } (Page) or plain array
+    Array.isArray(transactions) ? transactions :
+    transactions?.content ?? transactions?.transactions ?? null
+  );
+  renderBudgets(
+    Array.isArray(budgets) ? budgets :
+    budgets?.content ?? budgets?.budgets ?? null
+  );
+  renderGoals(
+    Array.isArray(goals) ? goals :
+    goals?.content ?? goals?.savingsGoals ?? null
+  );
+  renderOverviewInsights(insights, dashboard);
+  renderAccounts(
+    Array.isArray(accounts) ? accounts :
+    accounts?.content ?? accounts?.accounts ?? null
+  );
+
+  // Animate bars that may have been rendered before bootstrap
+  setTimeout(() => {
+    document.querySelectorAll('.bud-fill').forEach(el => { if (!el.style.width || el.style.width === '0%') el.style.width = el.dataset.w + '%'; });
+    document.querySelectorAll('.goal-bar-fill').forEach(el => { if (!el.style.width || el.style.width === '0%') el.style.width = el.dataset.w + '%'; });
+  }, 600);
+
+  const connected = !!(dashboard ?? transactions ?? accounts);
+  setConnectionState(connected ? 'Live' : 'Offline', connected ? 'var(--acid)' : 'var(--ember)');
+
+  if (!connected) showAuthModal('login');
+}
+
+async function handleAuthSubmit(event) {
+  event.preventDefault();
+  const submit = document.getElementById('authSubmit');
+  const email = document.getElementById('authEmail')?.value?.trim();
+  const password = document.getElementById('authPassword')?.value || '';
+  const fullName = document.getElementById('authFullName')?.value?.trim();
+
+  if (!email || !password || (authMode === 'register' && !fullName)) {
+    setAuthError('Complete the required fields first.');
+    return;
+  }
+
+  setAuthError('');
+  if (submit) {
+    submit.disabled = true;
+    submit.textContent = authMode === 'register' ? 'Creating...' : 'Signing In...';
+  }
+
+  try {
+    const endpoint = authMode === 'register' ? '/auth/register' : '/auth/login';
+    const payload = authMode === 'register'
+      ? { email, password, fullName, currency: 'INR' }
+      : { email, password };
+    const next = await authRequest(endpoint, payload);
+    saveAuthState({
+      accessToken: next.accessToken,
+      refreshToken: next.refreshToken,
+      user: next.user,
+    });
+    hideAuthModal();
+    await bootstrap();
+  } catch (err) {
+    const message = err.message === 'Email already in use'
+      ? 'This email is already registered. Switch to Login and use your password.'
+      : (err.message || 'Authentication failed.');
+    setAuthError(message);
+    showAuthModal(authMode);
+  } finally {
+    if (submit) submit.disabled = false;
+    setAuthMode(authMode);
+  }
+}
+
+async function handleLogout() {
+  await api('/auth/logout', { method: 'POST', retryAuth: false });
+  clearAuthState();
+  showAuthModal('login');
+}
+
+function bindAuthUi() {
+  document.getElementById('userChip')?.addEventListener('click', () => showAuthModal(authState.accessToken ? authMode : 'login'));
+  document.getElementById('authClose')?.addEventListener('click', () => hideAuthModal());
+  document.getElementById('authForm')?.addEventListener('submit', handleAuthSubmit);
+  document.getElementById('authRefresh')?.addEventListener('click', async () => {
+    hideAuthModal();
+    await bootstrap();
+  });
+  document.getElementById('authLogout')?.addEventListener('click', handleLogout);
+  document.querySelectorAll('[data-auth-mode]').forEach(el => {
+    el.addEventListener('click', () => setAuthMode(el.dataset.authMode));
+  });
+}
+
+// ‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê
+// INIT
+// ‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê‚?ê
+window.addEventListener('load', () => {
+  bindAuthUi();
+  syncAuthUi();
+
+  // Entrance animation (runs immediately with static data visible)
+  gsap.to('.reveal', {
+    opacity: 1, y: 0, duration: 0.7,
+    ease: 'power3.out', stagger: 0.1, delay: 0.1
+  });
+
+  // Static counter fallback ‚?? animates whatever data-t values exist in HTML
+  // These get overwritten by bootstrap() if API responds
+  setTimeout(() => {
+    document.querySelectorAll('.mc').forEach(el => animCount(el, parseInt(el.dataset.t), 1800));
+    const heroInt = document.getElementById('hero-int');
+    const heroDec = document.getElementById('hero-dec');
+    if (heroInt) animHeroNumber(heroInt, heroDec, 1245230);
+  }, 200);
+
+  setTimeout(() => {
+    document.querySelectorAll('.bud-fill').forEach(el => { el.style.width = el.dataset.w + '%'; });
+    document.querySelectorAll('.goal-bar-fill').forEach(el => { el.style.width = el.dataset.w + '%'; });
+  }, 600);
+
+  // Render static chart immediately, then override with real data
+  renderChart(null);
+
+  // Static donut fallback
+  renderDonut([
+    { label: 'HDFC Savings', value: 482000, color: 'var(--acid)' },
+    { label: 'Investments',  value: 620000, color: 'var(--ice)'  },
+    { label: 'UPI Wallet',   value: 43230,  color: 'var(--ember)'},
+  ]);
+
+  gsap.from('.tx-row', {
+    x: -16, opacity: 0, duration: 0.4,
+    stagger: 0.06, ease: 'power2.out', delay: 0.8
+  });
+
+  // Fetch live data ‚?? UI is already interactive while this runs
+  bootstrap();
+});
+</script>
+</body>
+</html>
+

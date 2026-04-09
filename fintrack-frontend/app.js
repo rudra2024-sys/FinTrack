@@ -1,0 +1,1616 @@
+﻿const API_BASES = ["http://localhost:8080/api", "http://localhost:8081/api"];
+const TX_PAGE_SIZE = 15;
+const DASH_TX_PAGE_SIZE = 8;
+const CATEGORY_COLORS = ["#c8f000", "#00e5ff", "#ff4d00", "#e8e4dc", "#7bd389", "#ff8fab"];
+
+const APP_STATE = {
+  token: null,
+  user: null,
+  apiBase: null,
+  activePage: "dashboard",
+  dataLoaded: false,
+  analytics: {},
+  intelligence: {},
+  insights: {},
+  transactions: [],
+  accounts: [],
+  budgets: [],
+  goals: [],
+  recurring: [],
+  hmmByDate: {},
+  charts: {},
+  txPage: 0,
+  selectedUploadAccount: "",
+  dashboardFilters: { search: "", category: "", type: "", state: "", page: 1 },
+};
+
+const PAGE_STATE = {
+  budgetsLoaded: false,
+};
+
+function asNumber(value) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : 0;
+}
+
+function formatAmount(value) {
+  return Math.round(asNumber(value)).toLocaleString("en-IN");
+}
+
+function formatCurrency(value) {
+  return `₹${formatAmount(value)}`;
+}
+
+function formatDateLabel(value) {
+  if (!value) return "—";
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+function formatShortDate(value) {
+  if (!value) return "—";
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+}
+
+function formatMonthLabel(value) {
+  if (!value) return "—";
+  const date = new Date(`${value}-01T00:00:00`);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString("en-IN", { month: "short", year: "2-digit" });
+}
+
+function formatCompactCurrency(value) {
+  const amount = asNumber(value);
+  if (amount >= 100000) {
+    return `₹${(amount / 100000).toFixed(2)}L`;
+  }
+  if (amount >= 1000) {
+    return `₹${(amount / 1000).toFixed(1)}K`;
+  }
+  return formatCurrency(amount);
+}
+
+function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (char) => (
+    {
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;",
+    }[char]
+  ));
+}
+
+function normalizeType(value) {
+  if (!value) return "";
+  const upper = String(value).toUpperCase();
+  if (upper === "CREDIT") return "INCOME";
+  if (upper === "DEBIT") return "EXPENSE";
+  return upper;
+}
+
+function normalizeHmmState(value) {
+  if (!value) return "NORMAL";
+  const upper = String(value).toUpperCase();
+  if (upper.includes("LOW")) return "LOW";
+  if (upper.includes("HIGH")) return "HIGH";
+  return "NORMAL";
+}
+
+function getStateColor(state) {
+  if (state === "LOW") return "var(--acid)";
+  if (state === "HIGH") return "var(--ember)";
+  return "#ffd166";
+}
+
+function getStateBadge(state) {
+  const normalized = normalizeHmmState(state);
+  return `<span style="display:inline-flex;align-items:center;gap:6px;font-family:var(--font-mono);font-size:9px;letter-spacing:0.08em;text-transform:uppercase;color:${getStateColor(normalized)}">${normalized}</span>`;
+}
+
+function setText(id, value) {
+  const element = document.getElementById(id);
+  if (element) {
+    element.textContent = value;
+  }
+}
+
+function revealElements(container = document) {
+  const elements = Array.from(container.querySelectorAll?.(".reveal") || []);
+  if (!elements.length) return;
+
+  elements.forEach((element) => {
+    element.style.opacity = "1";
+    element.style.transform = "translateY(0)";
+    element.style.transition = "opacity 0.35s ease, transform 0.35s ease";
+  });
+}
+
+function showToast(message, type = "info") {
+  const toast = document.createElement("div");
+  toast.style.cssText = `position:fixed;bottom:24px;right:24px;z-index:10000;background:var(--card);border:1px solid var(--line);color:var(--offwhite);padding:16px 20px;font-family:var(--font-mono);font-size:11px;letter-spacing:0.08em;border-left:3px solid ${type === "error" ? "var(--ember)" : type === "success" ? "var(--acid)" : "var(--ice)"};max-width:360px`;
+  toast.textContent = message;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 3200);
+}
+
+function showFailure(message, options = {}) {
+  const { alertUser = true } = options;
+  console.error(message);
+  showToast(message, "error");
+  if (alertUser) {
+    window.alert(message);
+  }
+}
+
+function getApiBases() {
+  if (!APP_STATE.apiBase) return [...API_BASES];
+  return [APP_STATE.apiBase, ...API_BASES.filter((base) => base !== APP_STATE.apiBase)];
+}
+
+function loadAuthState() {
+  APP_STATE.token = localStorage.getItem("token");
+  try {
+    APP_STATE.user = JSON.parse(localStorage.getItem("fintrack_user") || "null");
+  } catch {
+    APP_STATE.user = null;
+  }
+}
+
+function saveAuthState(token, user) {
+  APP_STATE.token = token;
+  APP_STATE.user = user || null;
+  localStorage.setItem("token", token);
+  localStorage.setItem("fintrack_user", JSON.stringify(user || null));
+  console.log("TOKEN STORED");
+}
+
+function clearAuth() {
+  APP_STATE.token = null;
+  APP_STATE.user = null;
+  localStorage.removeItem("token");
+  localStorage.removeItem("fintrack_user");
+}
+
+function getUserDisplayName() {
+  const user = APP_STATE.user || {};
+  return user.fullName || user.name || user.username || user.email || "User";
+}
+
+function getUserInitial() {
+  const label = getUserDisplayName().trim();
+  return label ? label.charAt(0).toUpperCase() : "U";
+}
+
+function renderUserChip() {
+  setText("user-name", getUserDisplayName());
+  setText("user-initial", getUserInitial());
+}
+
+function setButtonBusy(button, busy, idleLabel, busyLabel) {
+  if (!button) return;
+  button.disabled = busy;
+  button.textContent = busy ? busyLabel : idleLabel;
+  button.style.opacity = busy ? "0.7" : "1";
+  button.style.cursor = busy ? "wait" : "pointer";
+}
+
+function normalizeAuthUser(user, fallback = {}) {
+  if (user && typeof user === "object") {
+    return {
+      ...user,
+      fullName: user.fullName || user.name || fallback.fullName || null,
+      email: user.email || fallback.email || null,
+    };
+  }
+
+  return {
+    fullName: fallback.fullName || null,
+    email: fallback.email || null,
+  };
+}
+
+function goToLoginPage(message = "") {
+  document.body.style.cursor = "auto";
+  document.body.innerHTML = `
+    <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#0a0a08;padding:24px">
+      <div style="width:100%;max-width:440px;border:1px solid rgba(255,255,255,0.08);background:#131310;padding:36px;color:#e8e4dc;font-family:'Barlow',sans-serif">
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:32px;font-weight:900;letter-spacing:0.14em;text-transform:uppercase;margin-bottom:12px">FIN<span style="color:#c8f000">TRACK</span></div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:0.18em;color:#5a5a52;text-transform:uppercase;margin-bottom:20px">Login</div>
+        ${message ? `<div style="margin-bottom:16px;padding:12px;border:1px solid rgba(255,77,0,0.3);background:rgba(255,77,0,0.08);font-family:'IBM Plex Mono',monospace;font-size:10px;color:#ffb4a2">${escapeHtml(message)}</div>` : ""}
+        <form id="login-form" style="display:flex;flex-direction:column;gap:14px">
+          <input id="login-email" type="email" autocomplete="email" placeholder="Email" required style="background:#0f0f0c;border:1px solid rgba(255,255,255,0.08);color:#e8e4dc;padding:12px 14px;font-family:'IBM Plex Mono',monospace;font-size:12px;outline:none" />
+          <input id="login-password" type="password" autocomplete="current-password" placeholder="Password" required style="background:#0f0f0c;border:1px solid rgba(255,255,255,0.08);color:#e8e4dc;padding:12px 14px;font-family:'IBM Plex Mono',monospace;font-size:12px;outline:none" />
+          <button id="login-submit" type="submit" style="background:#c8f000;color:#000;border:none;padding:12px 14px;font-family:'Barlow Condensed',sans-serif;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;cursor:pointer">Login</button>
+        </form>
+        <div style="margin-top:12px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:#5a5a52;line-height:1.6">Demo account: <span style="color:#e8e4dc">test@fintrack.com</span> / <span style="color:#e8e4dc">password123</span></div>
+        <form id="register-form" style="display:flex;flex-direction:column;gap:14px;margin-top:24px;padding-top:20px;border-top:1px solid rgba(255,255,255,0.08)">
+          <input id="register-name" type="text" autocomplete="name" placeholder="Full name" required style="background:#0f0f0c;border:1px solid rgba(255,255,255,0.08);color:#e8e4dc;padding:12px 14px;font-family:'IBM Plex Mono',monospace;font-size:12px;outline:none" />
+          <input id="register-email" type="email" autocomplete="email" placeholder="Email" required style="background:#0f0f0c;border:1px solid rgba(255,255,255,0.08);color:#e8e4dc;padding:12px 14px;font-family:'IBM Plex Mono',monospace;font-size:12px;outline:none" />
+          <input id="register-password" type="password" autocomplete="new-password" placeholder="Password (min 8 chars)" required style="background:#0f0f0c;border:1px solid rgba(255,255,255,0.08);color:#e8e4dc;padding:12px 14px;font-family:'IBM Plex Mono',monospace;font-size:12px;outline:none" />
+          <button id="register-submit" type="submit" style="background:transparent;color:#00e5ff;border:1px solid rgba(0,229,255,0.28);padding:12px 14px;font-family:'Barlow Condensed',sans-serif;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;cursor:pointer">Register</button>
+        </form>
+      </div>
+    </div>`;
+
+  document.getElementById("login-form")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    await handleLogin(document.getElementById("login-email").value, document.getElementById("login-password").value);
+  });
+
+  document.getElementById("register-form")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    await handleRegister(
+      document.getElementById("register-name").value,
+      document.getElementById("register-email").value,
+      document.getElementById("register-password").value,
+    );
+  });
+}
+
+function handleUnauthorized() {
+  clearAuth();
+  goToLoginPage("Session expired. Please log in again.");
+}
+
+async function apiRequest(endpoint, options = {}) {
+  const { method = "GET", body = null, headers = {}, silent = false } = options;
+  const path = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
+  const bases = getApiBases();
+  let lastError = null;
+
+  for (let index = 0; index < bases.length; index += 1) {
+    const base = bases[index];
+    const url = `${base}${path}`;
+    const requestHeaders = { ...headers };
+    if (!(body instanceof FormData) && !requestHeaders["Content-Type"]) {
+      requestHeaders["Content-Type"] = "application/json";
+    }
+    if (APP_STATE.token) {
+      requestHeaders.Authorization = `Bearer ${APP_STATE.token}`;
+    }
+
+    const requestOptions = { method, headers: requestHeaders };
+    if (body !== null) {
+      requestOptions.body = body instanceof FormData ? body : JSON.stringify(body);
+    }
+
+    try {
+      console.log("[API REQUEST]", method, url, body instanceof FormData ? "[FormData]" : body || "");
+      const response = await fetch(url, requestOptions);
+      const contentType = (response.headers.get("content-type") || "").toLowerCase();
+      const payload = contentType.includes("application/json")
+        ? await response.json().catch(() => null)
+        : await response.text().catch(() => null);
+      console.log("[API RESPONSE]", response.status, url, payload);
+
+      if (response.status === 401) {
+        handleUnauthorized();
+        return null;
+      }
+
+      if (response.ok) {
+        APP_STATE.apiBase = base;
+        return payload;
+      }
+
+      const errorMessage = payload?.message || payload?.error || `HTTP ${response.status}`;
+      lastError = new Error(errorMessage);
+      if (response.status === 404 && index < bases.length - 1) {
+        continue;
+      }
+      throw lastError;
+    } catch (error) {
+      lastError = error;
+      console.error("[API RESPONSE]", url, error);
+      if (index < bases.length - 1) {
+        continue;
+      }
+    }
+  }
+
+  if (!silent) {
+    showFailure(lastError?.message || `Request failed for ${path}`);
+  }
+  return null;
+}
+function normalizeTransaction(transaction) {
+  const type = normalizeType(transaction.type || (asNumber(transaction.amount) >= 0 ? "INCOME" : "EXPENSE"));
+  const date = transaction.transactionDate || transaction.date || "";
+  const state = normalizeHmmState(transaction.hmmState || transaction.hmm_state || APP_STATE.hmmByDate[date]);
+  return {
+    id: transaction.id,
+    description: transaction.description || transaction.merchant || transaction.name || "Transaction",
+    subText: transaction.notes || transaction.merchant || "",
+    category: transaction.categoryName || transaction.category || "Uncategorized",
+    accountName: transaction.accountName || transaction.account || "—",
+    date,
+    amount: asNumber(transaction.amount),
+    type,
+    isRecurring: Boolean(transaction.isRecurring || transaction.is_recurring),
+    hmmState: state,
+  };
+}
+
+function buildHmmLookup(intelligence) {
+  const lookup = {};
+  const timeline = intelligence?.hidden_state_timeline;
+  if (Array.isArray(timeline)) {
+    timeline.forEach((item) => {
+      if (item?.date) {
+        lookup[item.date] = normalizeHmmState(item.hidden_state);
+      }
+    });
+  }
+  return lookup;
+}
+
+function destroyChart(name) {
+  if (APP_STATE.charts[name]) {
+    APP_STATE.charts[name].destroy();
+    APP_STATE.charts[name] = null;
+  }
+}
+
+function getMonthlyTrendData() {
+  if (Array.isArray(APP_STATE.analytics?.monthlyTrend) && APP_STATE.analytics.monthlyTrend.length) {
+    return APP_STATE.analytics.monthlyTrend;
+  }
+  if (Array.isArray(APP_STATE.analytics?.monthlyData) && APP_STATE.analytics.monthlyData.length) {
+    return APP_STATE.analytics.monthlyData;
+  }
+  return [];
+}
+
+function buildPolylinePath(points) {
+  if (!points.length) return "";
+  return points.map((point, index) => `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`).join(" ");
+}
+
+function renderTrendSvg(svgId, items, series) {
+  const svg = document.getElementById(svgId);
+  if (!svg) return;
+
+  const rows = Array.isArray(items) ? items : [];
+  if (!rows.length) {
+    svg.innerHTML = `<text x="50%" y="50%" text-anchor="middle" fill="rgba(255,255,255,0.28)" font-size="10" font-family="var(--font-mono)">No trend data available</text>`;
+    return;
+  }
+
+  const width = svg.clientWidth || 760;
+  const height = svg.clientHeight || 240;
+  const margin = { top: 16, right: 20, bottom: 28, left: 36 };
+  const plotWidth = Math.max(width - margin.left - margin.right, 20);
+  const plotHeight = Math.max(height - margin.top - margin.bottom, 20);
+  const maxValue = Math.max(
+    ...rows.flatMap((item) => series.map((entry) => asNumber(item[entry.key]))),
+    1,
+  );
+  const xForIndex = (index) => (
+    rows.length === 1
+      ? margin.left + (plotWidth / 2)
+      : margin.left + ((plotWidth / (rows.length - 1)) * index)
+  );
+  const yForValue = (value) => margin.top + plotHeight - ((asNumber(value) / maxValue) * plotHeight);
+
+  const gridLines = Array.from({ length: 4 }, (_, index) => {
+    const y = margin.top + ((plotHeight / 3) * index);
+    return `<line x1="${margin.left}" y1="${y}" x2="${width - margin.right}" y2="${y}" stroke="rgba(255,255,255,0.06)" stroke-width="1" />`;
+  }).join("");
+
+  const xLabels = rows.map((item, index) => {
+    const x = xForIndex(index);
+    return `<text x="${x}" y="${height - 8}" text-anchor="middle" fill="rgba(255,255,255,0.38)" font-size="8" font-family="var(--font-mono)">${escapeHtml(formatMonthLabel(item.month || item.period))}</text>`;
+  }).join("");
+
+  const paths = series.map((entry) => {
+    const points = rows.map((item, index) => ({
+      x: xForIndex(index),
+      y: yForValue(item[entry.key]),
+      value: asNumber(item[entry.key]),
+    }));
+    const path = buildPolylinePath(points);
+    const pointDots = points.map((point) => `<circle cx="${point.x}" cy="${point.y}" r="2.5" fill="${entry.color}" />`).join("");
+    return `<path d="${path}" fill="none" stroke="${entry.color}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" />${pointDots}`;
+  }).join("");
+
+  svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+  svg.innerHTML = `${gridLines}${paths}${xLabels}`;
+}
+
+function renderDonutSvg(svgId, items, centerId, legendId) {
+  const svg = document.getElementById(svgId);
+  const center = centerId ? document.getElementById(centerId) : null;
+  const legend = legendId ? document.getElementById(legendId) : null;
+  if (!svg) return;
+
+  const normalizedItems = (Array.isArray(items) ? items : []).filter((item) => asNumber(item.value) > 0);
+  const total = normalizedItems.reduce((sum, item) => sum + asNumber(item.value), 0);
+
+  if (!normalizedItems.length || total <= 0) {
+    svg.innerHTML = `<circle cx="80" cy="80" r="54" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="18" />`;
+    if (center) center.textContent = "—";
+    if (legend) legend.innerHTML = '<div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);text-transform:uppercase">No category data available</div>';
+    return;
+  }
+
+  const radius = svgId === "donut" ? 46 : 54;
+  const strokeWidth = svgId === "donut" ? 16 : 18;
+  const centerPoint = svgId === "donut" ? 65 : 80;
+  const circumference = 2 * Math.PI * radius;
+  let offset = 0;
+
+  svg.innerHTML = normalizedItems.map((item) => {
+    const segment = (asNumber(item.value) / total) * circumference;
+    const circle = `<circle cx="${centerPoint}" cy="${centerPoint}" r="${radius}" fill="none" stroke="${item.color}" stroke-width="${strokeWidth}" stroke-dasharray="${segment} ${Math.max(circumference - segment, 0)}" stroke-dashoffset="${-offset}" transform="rotate(-90 ${centerPoint} ${centerPoint})" stroke-linecap="butt" />`;
+    offset += segment;
+    return circle;
+  }).join("");
+
+  if (center) {
+    center.textContent = formatCompactCurrency(total);
+  }
+  if (legend) {
+    legend.innerHTML = normalizedItems.map((item) => `
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+        <div style="display:flex;align-items:center;gap:10px;font-family:var(--font-mono);font-size:9px;color:var(--offwhite);text-transform:uppercase;letter-spacing:0.08em">
+          <span style="width:8px;height:8px;border-radius:50%;display:inline-block;background:${item.color}"></span>
+          <span>${escapeHtml(item.label)}</span>
+        </div>
+        <div style="font-family:var(--font-display);font-size:15px;color:${item.color}">${formatCurrency(item.value)}</div>
+      </div>`).join("");
+  }
+}
+
+function getCategorySeries() {
+  if (Array.isArray(APP_STATE.analytics?.topCategories) && APP_STATE.analytics.topCategories.length) {
+    return APP_STATE.analytics.topCategories.map((item, index) => ({
+      label: item.category || `Category ${index + 1}`,
+      value: asNumber(item.amount),
+      color: item.color || CATEGORY_COLORS[index % CATEGORY_COLORS.length],
+    }));
+  }
+
+  if (Array.isArray(APP_STATE.intelligence?.category_distribution) && APP_STATE.intelligence.category_distribution.length) {
+    return APP_STATE.intelligence.category_distribution.map((item, index) => ({
+      label: item.category || `Category ${index + 1}`,
+      value: asNumber(item.amount),
+      color: CATEGORY_COLORS[index % CATEGORY_COLORS.length],
+    }));
+  }
+
+  return [];
+}
+
+function getAnomalyItems() {
+  if (Array.isArray(APP_STATE.insights?.anomalies) && APP_STATE.insights.anomalies.length) {
+    return APP_STATE.insights.anomalies.map((item) => ({
+      title: item.type || "Anomaly",
+      message: item.description || item.message || "Anomaly detected",
+      amount: item.amount,
+    }));
+  }
+
+  if (Array.isArray(APP_STATE.intelligence?.alerts) && APP_STATE.intelligence.alerts.length) {
+    return APP_STATE.intelligence.alerts.map((item) => ({
+      title: item.title || item.level || "Alert",
+      message: item.detail || item.title || "Alert detected",
+      amount: null,
+    }));
+  }
+
+  return [];
+}
+
+function updateTransactionFilterLabels() {
+  const transactionTypeFilter = document.getElementById("tx-filter-type");
+  if (transactionTypeFilter) {
+    [...transactionTypeFilter.options].forEach((option) => {
+      if (option.value === "CREDIT") option.value = "INCOME";
+      if (option.value === "DEBIT") option.value = "EXPENSE";
+    });
+  }
+
+  const header = document.querySelector("#page-transactions .tx-full-header");
+  if (header?.children?.[3]) {
+    header.children[3].textContent = "HMM State";
+  }
+}
+
+function updateNavigation(page) {
+  APP_STATE.activePage = page;
+  document.querySelectorAll(".page").forEach((element) => element.classList.remove("active"));
+  document.getElementById(`page-${page}`)?.classList.add("active");
+  document.querySelectorAll("[data-page]").forEach((element) => {
+    element.classList.toggle("active", element.classList.contains("nav-icon") && element.dataset.page === page);
+    element.classList.toggle("on", element.classList.contains("tn") && element.dataset.page === page);
+  });
+  setText("tb-section-label", page.charAt(0).toUpperCase() + page.slice(1));
+}
+
+function wireCursor() {
+  const cursor = document.getElementById("cursor");
+  const outer = document.getElementById("cursor-outer");
+  if (!cursor || !outer) return;
+
+  document.addEventListener("mousemove", (event) => {
+    cursor.style.transform = `translate(${event.clientX - 4}px, ${event.clientY - 4}px)`;
+    outer.style.transform = `translate(${event.clientX - 16}px, ${event.clientY - 16}px)`;
+  });
+}
+
+function populateCategoryFilters() {
+  const categories = [...new Set(APP_STATE.transactions.map((transaction) => transaction.category).filter(Boolean))].sort();
+  const filters = [document.getElementById("tx-filter-cat"), document.getElementById("dash-catFilter")].filter(Boolean);
+  filters.forEach((select) => {
+    const currentValue = select.value;
+    select.innerHTML = '<option value="">All Categories</option>';
+    categories.forEach((category) => {
+      const option = document.createElement("option");
+      option.value = category;
+      option.textContent = category;
+      select.appendChild(option);
+    });
+    select.value = categories.includes(currentValue) ? currentValue : "";
+  });
+}
+
+function renderTransactionTable() {
+  const list = document.getElementById("tx-full-list");
+  if (!list) return;
+
+  const search = (document.getElementById("tx-search")?.value || "").trim().toLowerCase();
+  const typeFilter = normalizeType(document.getElementById("tx-filter-type")?.value || "");
+  const categoryFilter = document.getElementById("tx-filter-cat")?.value || "";
+
+  const filtered = APP_STATE.transactions.filter((transaction) => {
+    const matchesSearch = !search || `${transaction.description} ${transaction.category}`.toLowerCase().includes(search);
+    const matchesType = !typeFilter || transaction.type === typeFilter;
+    const matchesCategory = !categoryFilter || transaction.category === categoryFilter;
+    return matchesSearch && matchesType && matchesCategory;
+  });
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / TX_PAGE_SIZE));
+  if (APP_STATE.txPage >= totalPages) {
+    APP_STATE.txPage = 0;
+  }
+
+  const pageItems = filtered.slice(APP_STATE.txPage * TX_PAGE_SIZE, (APP_STATE.txPage + 1) * TX_PAGE_SIZE);
+  if (!pageItems.length) {
+    list.innerHTML = '<div class="page-loading">No transactions found</div>';
+  } else {
+    list.innerHTML = pageItems.map((transaction, index) => `
+      <div class="tx-full-row">
+        <span class="tx-row-num">${APP_STATE.txPage * TX_PAGE_SIZE + index + 1}</span>
+        <div>
+          <div class="tx-full-name">${escapeHtml(transaction.description)}</div>
+          <div class="tx-full-sub">${escapeHtml(transaction.subText || transaction.accountName)}</div>
+        </div>
+        <span class="tx-full-cat">${escapeHtml(transaction.category)}</span>
+        <span class="tx-full-acc">${getStateBadge(transaction.hmmState)}</span>
+        <span class="tx-full-date">${formatShortDate(transaction.date)}</span>
+        <span class="tx-full-amount ${transaction.type === "INCOME" ? "up" : "dn"}">${transaction.type === "INCOME" ? "+" : "-"}${formatCurrency(transaction.amount)}</span>
+      </div>`).join("");
+  }
+
+  setText("tx-page-info", `PAGE ${APP_STATE.txPage + 1} / ${totalPages}`);
+  const previous = document.getElementById("tx-prev");
+  const next = document.getElementById("tx-next");
+  if (previous) previous.disabled = APP_STATE.txPage === 0;
+  if (next) next.disabled = APP_STATE.txPage >= totalPages - 1;
+}
+
+function renderDashboardSummary() {
+  const analytics = APP_STATE.analytics || {};
+  const totalIncome = asNumber(analytics.totalIncome);
+  const totalExpenses = asNumber(analytics.totalExpenses || analytics.totalExpense);
+  const netSavings = asNumber(analytics.netSavings || totalIncome - totalExpenses);
+  const savingsRate = analytics.savingsRate != null
+    ? `${Number(analytics.savingsRate).toFixed(1)}%`
+    : `${(totalIncome > 0 ? (netSavings / totalIncome) * 100 : 0).toFixed(1)}%`;
+  const totalBalance = asNumber(analytics.totalBalance || analytics.accountBalance);
+
+  setText("dash-totalIncome", formatCurrency(totalIncome));
+  setText("dash-totalExpenses", formatCurrency(totalExpenses));
+  setText("dash-netSavings", formatCurrency(netSavings));
+  setText("dash-savingsRate", savingsRate);
+  setText("dash-totalBalance", formatCurrency(totalBalance));
+}
+
+function renderDashboardInsights() {
+  const categories = getCategorySeries().sort((left, right) => right.value - left.value);
+  if (categories[0]) {
+    setText("dash-topCategory", categories[0].label);
+    const total = categories.reduce((sum, item) => sum + item.value, 0);
+    const percentage = total > 0 ? ((categories[0].value / total) * 100).toFixed(1) : "0.0";
+    setText("dash-topCategoryPercent", `${percentage}% of spending`);
+  }
+
+  const merchants = new Map();
+  APP_STATE.transactions.forEach((transaction) => {
+    merchants.set(transaction.description, (merchants.get(transaction.description) || 0) + 1);
+  });
+  const topMerchant = [...merchants.entries()].sort((left, right) => right[1] - left[1])[0];
+  if (topMerchant) {
+    setText("dash-topMerchant", topMerchant[0]);
+    setText("dash-topMerchantCount", `${topMerchant[1]} transactions`);
+  }
+
+  const unusualAmount = APP_STATE.transactions.reduce((max, transaction) => Math.max(max, transaction.amount), 0);
+  setText("dash-unusualAmount", formatCurrency(unusualAmount));
+  setText("dash-recurringCount", String(APP_STATE.transactions.filter((transaction) => transaction.isRecurring).length));
+}
+function renderDashboardAnomalies() {
+  const container = document.getElementById("dash-anomalies");
+  if (!container) return;
+
+  const anomalies = getAnomalyItems();
+  if (!anomalies.length) {
+    container.innerHTML = '<div class="alert-box"><span style="color:var(--muted);font-family:var(--font-mono);font-size:10px;text-transform:uppercase">No anomalies detected</span></div>';
+    return;
+  }
+
+  container.innerHTML = anomalies.map((item) => `
+    <div class="alert-box alert-warning">
+      <div style="font-family:var(--font-mono);font-size:8px;letter-spacing:0.12em;color:var(--muted);text-transform:uppercase">${escapeHtml(item.title)}</div>
+      <div style="margin-top:6px;color:var(--offwhite)">${escapeHtml(item.message)}${item.amount ? ` • ${formatCurrency(item.amount)}` : ""}</div>
+    </div>`).join("");
+}
+
+function renderDashboardCharts() {
+  if (typeof Chart === "undefined") return;
+
+  const categoryCanvas = document.getElementById("dash-categoryChart");
+  const trendCanvas = document.getElementById("dash-trendChart");
+  const hmmCanvas = document.getElementById("dash-hmmChart");
+  const categories = getCategorySeries();
+  const monthlyTrend = Array.isArray(APP_STATE.analytics?.monthlyTrend)
+    ? APP_STATE.analytics.monthlyTrend
+    : Array.isArray(APP_STATE.analytics?.monthlyData)
+      ? APP_STATE.analytics.monthlyData
+      : [];
+  const stateCounts = { LOW: 0, NORMAL: 0, HIGH: 0 };
+  Object.values(APP_STATE.hmmByDate).forEach((state) => {
+    stateCounts[normalizeHmmState(state)] += 1;
+  });
+  if (!Object.keys(APP_STATE.hmmByDate).length) {
+    APP_STATE.transactions.forEach((transaction) => {
+      stateCounts[normalizeHmmState(transaction.hmmState)] += 1;
+    });
+  }
+
+  destroyChart("category");
+  destroyChart("trend");
+  destroyChart("hmm");
+
+  if (categoryCanvas) {
+    APP_STATE.charts.category = new Chart(categoryCanvas, {
+      type: "doughnut",
+      data: {
+        labels: categories.map((item) => item.label),
+        datasets: [{
+          data: categories.map((item) => item.value),
+          backgroundColor: categories.map((item, index) => item.color || CATEGORY_COLORS[index % CATEGORY_COLORS.length]),
+          borderColor: "#0a0a08",
+          borderWidth: 2,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { labels: { color: "#5a5a52" } } },
+      },
+    });
+  }
+
+  if (trendCanvas) {
+    APP_STATE.charts.trend = new Chart(trendCanvas, {
+      type: "line",
+      data: {
+        labels: monthlyTrend.map((item) => formatMonthLabel(item.month)),
+        datasets: [
+          {
+            label: "Income",
+            data: monthlyTrend.map((item) => asNumber(item.income)),
+            borderColor: "#c8f000",
+            backgroundColor: "rgba(200,240,0,0.12)",
+            tension: 0.35,
+            borderWidth: 2,
+          },
+          {
+            label: "Expenses",
+            data: monthlyTrend.map((item) => asNumber(item.expenses)),
+            borderColor: "#ff4d00",
+            backgroundColor: "rgba(255,77,0,0.10)",
+            tension: 0.35,
+            borderWidth: 2,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { labels: { color: "#5a5a52" } } },
+        scales: {
+          x: { ticks: { color: "#5a5a52" }, grid: { color: "rgba(255,255,255,0.04)" } },
+          y: { ticks: { color: "#5a5a52" }, grid: { color: "rgba(255,255,255,0.04)" } },
+        },
+      },
+    });
+  }
+
+  if (hmmCanvas) {
+    APP_STATE.charts.hmm = new Chart(hmmCanvas, {
+      type: "bar",
+      data: {
+        labels: ["LOW", "NORMAL", "HIGH"],
+        datasets: [{
+          data: [stateCounts.LOW, stateCounts.NORMAL, stateCounts.HIGH],
+          backgroundColor: ["#36d399", "#ffd166", "#ff4d00"],
+          borderColor: "#0a0a08",
+          borderWidth: 1,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { color: "#5a5a52" }, grid: { color: "rgba(255,255,255,0.04)" } },
+          y: { ticks: { color: "#5a5a52" }, grid: { color: "rgba(255,255,255,0.04)" } },
+        },
+      },
+    });
+  }
+
+  const totalStates = stateCounts.LOW + stateCounts.NORMAL + stateCounts.HIGH;
+  setText("dash-stateLow", String(stateCounts.LOW));
+  setText("dash-stateNormal", String(stateCounts.NORMAL));
+  setText("dash-stateHigh", String(stateCounts.HIGH));
+  setText("dash-stateLowPct", `${totalStates ? Math.round((stateCounts.LOW / totalStates) * 100) : 0}% of days`);
+  setText("dash-stateNormalPct", `${totalStates ? Math.round((stateCounts.NORMAL / totalStates) * 100) : 0}% of days`);
+  setText("dash-stateHighPct", `${totalStates ? Math.round((stateCounts.HIGH / totalStates) * 100) : 0}% of days`);
+}
+
+function renderDashboardTransactionTable() {
+  const tableBody = document.getElementById("dash-txTable");
+  const pagination = document.getElementById("dash-pagination");
+  if (!tableBody) return;
+
+  const { search, category, type, state } = APP_STATE.dashboardFilters;
+  const filtered = APP_STATE.transactions.filter((transaction) => {
+    const matchesSearch = !search || `${transaction.description} ${transaction.category}`.toLowerCase().includes(search.toLowerCase());
+    const matchesCategory = !category || transaction.category === category;
+    const matchesType = !type || transaction.type === type;
+    const matchesState = !state || normalizeHmmState(transaction.hmmState) === normalizeHmmState(state);
+    return matchesSearch && matchesCategory && matchesType && matchesState;
+  });
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / DASH_TX_PAGE_SIZE));
+  if (APP_STATE.dashboardFilters.page > totalPages) {
+    APP_STATE.dashboardFilters.page = 1;
+  }
+
+  const start = (APP_STATE.dashboardFilters.page - 1) * DASH_TX_PAGE_SIZE;
+  const items = filtered.slice(start, start + DASH_TX_PAGE_SIZE);
+  if (!items.length) {
+    tableBody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:32px 0;font-family:var(--font-mono);font-size:10px;letter-spacing:0.15em;text-transform:uppercase">No transactions found</td></tr>';
+  } else {
+    tableBody.innerHTML = items.map((transaction) => `
+      <tr>
+        <td style="font-family:var(--font-mono);font-size:9px;color:var(--muted);padding:14px 0;border-bottom:1px solid var(--line2)">${formatDateLabel(transaction.date)}</td>
+        <td style="padding:14px 0;border-bottom:1px solid var(--line2)"><div style="font-family:var(--font-display);font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:var(--offwhite);font-size:14px">${escapeHtml(transaction.description)}</div><div style="font-family:var(--font-mono);font-size:8px;color:var(--muted);letter-spacing:0.1em;margin-top:3px">${escapeHtml(transaction.accountName)}</div></td>
+        <td style="font-family:var(--font-mono);font-size:9px;color:var(--muted);padding:14px 0;border-bottom:1px solid var(--line2)">${transaction.type === "INCOME" ? "Credit" : "Debit"}</td>
+        <td style="font-family:var(--font-display);font-size:16px;font-weight:700;padding:14px 0;border-bottom:1px solid var(--line2);color:${transaction.type === "INCOME" ? "var(--acid)" : "var(--ember)"}">${transaction.type === "INCOME" ? "+" : "-"}${formatCurrency(transaction.amount)}</td>
+        <td style="font-family:var(--font-mono);font-size:9px;color:var(--muted);padding:14px 0;border-bottom:1px solid var(--line2);text-transform:uppercase;letter-spacing:0.08em">${escapeHtml(transaction.category)}</td>
+        <td style="padding:14px 0;border-bottom:1px solid var(--line2)">${getStateBadge(transaction.hmmState)}</td>
+      </tr>`).join("");
+  }
+
+  if (pagination) {
+    pagination.innerHTML = Array.from({ length: totalPages }, (_, index) => index + 1).map((pageNumber) => `
+      <button style="font-family:var(--font-mono);padding:6px 12px;border:1px solid var(--line);background:${pageNumber === APP_STATE.dashboardFilters.page ? "rgba(200,240,0,0.10)" : "transparent"};color:${pageNumber === APP_STATE.dashboardFilters.page ? "var(--acid)" : "var(--muted)"};cursor:pointer;font-size:10px" data-dash-page="${pageNumber}">${pageNumber}</button>`).join("");
+    pagination.querySelectorAll("[data-dash-page]").forEach((button) => {
+      button.addEventListener("click", () => {
+        APP_STATE.dashboardFilters.page = Number(button.dataset.dashPage);
+        renderDashboardTransactionTable();
+      });
+    });
+  }
+}
+
+function renderOverviewPage() {
+  const page = document.getElementById("page-overview");
+  if (!page) return;
+
+  const analytics = APP_STATE.analytics || {};
+  const monthlyTrend = getMonthlyTrendData();
+  const totalIncome = asNumber(analytics.totalIncome);
+  const totalExpenses = asNumber(analytics.totalExpenses || analytics.totalExpense);
+  const netSavings = asNumber(analytics.netSavings || totalIncome - totalExpenses);
+  const totalBalance = asNumber(analytics.totalBalance || analytics.accountBalance);
+  const savingsRate = analytics.savingsRate != null
+    ? Number(analytics.savingsRate).toFixed(1)
+    : (totalIncome > 0 ? ((netSavings / totalIncome) * 100) : 0).toFixed(1);
+  const heroParts = totalBalance.toFixed(2).split(".");
+  const heroDelta = page.querySelector(".badge-delta");
+  const heroLabel = page.querySelector(".badge-label");
+  const heroCounters = page.querySelectorAll(".mc");
+  const latestMonth = monthlyTrend[monthlyTrend.length - 1];
+  const previousMonth = monthlyTrend[monthlyTrend.length - 2];
+  const latestNet = asNumber(latestMonth?.net);
+  const previousNet = asNumber(previousMonth?.net);
+  const growth = previousNet > 0 ? (((latestNet - previousNet) / previousNet) * 100) : 0;
+
+  setText("hero-int", formatAmount(heroParts[0]));
+  setText("hero-dec", heroParts[1]);
+  if (heroDelta) heroDelta.textContent = `${growth >= 0 ? "+" : ""}${growth.toFixed(1)}% THIS MONTH`;
+  if (heroLabel) heroLabel.textContent = `Savings rate ${savingsRate}% with balance ${formatCompactCurrency(totalBalance)}`;
+  if (heroCounters[0]) heroCounters[0].textContent = formatAmount(totalIncome);
+  if (heroCounters[1]) heroCounters[1].textContent = formatAmount(totalExpenses);
+  if (heroCounters[2]) heroCounters[2].textContent = formatAmount(netSavings);
+  const heroDeltas = page.querySelectorAll(".hs-delta");
+  if (heroDeltas[0]) heroDeltas[0].textContent = `${monthlyTrend.length ? formatMonthLabel(latestMonth?.month) : "Current month"} income`;
+  if (heroDeltas[1]) heroDeltas[1].textContent = `${monthlyTrend.length ? formatMonthLabel(latestMonth?.month) : "Current month"} spend`;
+  if (heroDeltas[2]) heroDeltas[2].textContent = `${savingsRate}% savings rate`;
+
+  const tickerItems = [
+    ...APP_STATE.accounts.map((account) => ({
+      label: account.name,
+      value: formatCurrency(account.balance),
+      status: asNumber(account.balance) >= 0 ? "up" : "dn",
+      delta: account.type,
+    })),
+    ...getCategorySeries().slice(0, 3).map((category) => ({
+      label: category.label,
+      value: formatCurrency(category.value),
+      status: "dn",
+      delta: "spend",
+    })),
+  ];
+  const tickerTrack = document.getElementById("ticker-track");
+  if (tickerTrack && tickerItems.length) {
+    const doubled = [...tickerItems, ...tickerItems];
+    tickerTrack.innerHTML = doubled.map((item) => `
+      <div class="tick">
+        <span class="tick-name">${escapeHtml(item.label)}</span>
+        <span class="tick-val ${item.status}">${escapeHtml(item.value)}</span>
+        <span class="tick-val ${item.status}">${escapeHtml(item.delta)}</span>
+      </div>`).join("");
+  }
+
+  renderTrendSvg("chartSvg", monthlyTrend, [
+    { key: "income", color: "#c8f000" },
+    { key: "expenses", color: "#ff4d00" },
+    { key: "net", color: "#e8e4dc" },
+  ]);
+
+  renderDonutSvg("donut", APP_STATE.accounts.map((account, index) => ({
+    label: account.name,
+    value: asNumber(account.balance),
+    color: account.color || CATEGORY_COLORS[index % CATEGORY_COLORS.length],
+  })), "overview-donut-total", "donut-legend");
+
+  const accountsList = document.getElementById("accounts-list");
+  if (accountsList) {
+    accountsList.innerHTML = APP_STATE.accounts.length
+      ? APP_STATE.accounts.map((account, index) => {
+        const color = account.color || CATEGORY_COLORS[index % CATEGORY_COLORS.length];
+        return `<div class="account-row"><div class="acc-left"><div class="acc-dot" style="background:${color};box-shadow:0 0 6px ${color}"></div><div><div class="acc-name">${escapeHtml(account.name)}</div><div class="acc-type">${escapeHtml(account.institution || account.type)}</div></div></div><div class="acc-val" style="color:${color}">${formatCurrency(account.balance)}</div></div>`;
+      }).join("")
+      : '<div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);text-transform:uppercase">No accounts available</div>';
+  }
+
+  const txList = document.getElementById("overview-tx-list");
+  if (txList) {
+    const items = APP_STATE.transactions.slice(0, 5);
+    txList.innerHTML = items.length
+      ? items.map((transaction) => `
+        <div class="tx-row clickable">
+          <div><div class="tx-name">${escapeHtml(transaction.description)}</div><div class="tx-cat">${escapeHtml(transaction.category)}</div></div>
+          <div class="tx-date">${escapeHtml(formatShortDate(transaction.date))}</div>
+          <div class="tx-amount ${transaction.type === "INCOME" ? "up" : "dn"}">${transaction.type === "INCOME" ? "+" : "-"}${formatCurrency(transaction.amount)}</div>
+        </div>`).join("")
+      : '<div class="page-loading">No transactions yet</div>';
+  }
+
+  const budgetList = document.getElementById("overview-budget-list");
+  if (budgetList) {
+    const budgetItems = APP_STATE.budgets.length
+      ? APP_STATE.budgets.slice(0, 4).map((budget) => {
+        const spent = asNumber(budget.spent || budget.usedAmount);
+        const limit = Math.max(asNumber(budget.limit || budget.amount || budget.totalAmount), 1);
+        const percent = Math.min(Math.round((spent / limit) * 100), 100);
+        const color = percent >= 80 ? "var(--ember)" : percent >= 50 ? "var(--ice)" : "var(--acid)";
+        return {
+          name: budget.name || budget.categoryName || "Budget",
+          spent,
+          limit,
+          percent,
+          color,
+          status: percent >= 80 ? `${percent}% used — ${formatCurrency(limit - spent)} remaining` : `${percent}% used — On track`,
+        };
+      })
+      : getCategorySeries().slice(0, 4).map((category, index, array) => {
+        const maxValue = Math.max(...array.map((item) => item.value), 1);
+        const percent = Math.max(12, Math.round((category.value / maxValue) * 100));
+        const color = CATEGORY_COLORS[index % CATEGORY_COLORS.length];
+        return {
+          name: category.label,
+          spent: category.value,
+          limit: category.value * 1.25,
+          percent,
+          color,
+          status: `${percent}% of top category spend`,
+        };
+      });
+
+    budgetList.innerHTML = budgetItems.map((item) => `
+      <div class="bud-row">
+        <div class="bud-meta"><span class="bud-name">${escapeHtml(item.name)}</span><span class="bud-nums">${formatCurrency(item.spent)} / ${formatCurrency(item.limit)}</span></div>
+        <div class="bud-track"><div class="bud-fill" style="width:${item.percent}%;background:${item.color}"></div></div>
+        <div class="bud-status" style="color:${item.color}">${escapeHtml(item.status)}</div>
+      </div>`).join("");
+  }
+
+  const goalsList = document.getElementById("overview-goals-list");
+  if (goalsList) {
+    const goals = APP_STATE.goals.slice(0, 3);
+    goalsList.innerHTML = goals.length
+      ? goals.map((goal, index) => {
+        const color = goal.color || CATEGORY_COLORS[index % CATEGORY_COLORS.length];
+        const percent = Math.max(0, Math.min(100, Math.round(asNumber(goal.percentComplete))));
+        return `<div class="goal-row clickable"><div class="goal-index">${String(index + 1).padStart(2, "0")}</div><div class="goal-body"><div class="goal-name">${escapeHtml(goal.name)}</div><div class="goal-bar-track"><div class="goal-bar-fill" style="width:${percent}%;background:${color}"></div></div></div><div class="goal-right"><div class="goal-pct" style="color:${color}">${percent}%</div><div class="goal-eta">${goal.monthsToGoal != null ? `~${goal.monthsToGoal} months left` : "In progress"}</div></div></div>`;
+      }).join("")
+      : '<div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);text-transform:uppercase">No savings goals yet</div>';
+  }
+
+  const insightsList = document.getElementById("overview-insights-list");
+  if (insightsList) {
+    const insights = [
+      ...(Array.isArray(APP_STATE.intelligence?.insights) ? APP_STATE.intelligence.insights : []),
+      ...(Array.isArray(APP_STATE.insights?.recommendations) ? APP_STATE.insights.recommendations.map((item) => item.message || item.title).filter(Boolean) : []),
+    ].slice(0, 4);
+    insightsList.innerHTML = insights.length
+      ? insights.map((message, index) => {
+        const tags = ["WIN", "INFO", "ALERT", "NOTE"];
+        const colors = ["var(--acid)", "var(--ice)", "var(--ember)", "var(--offwhite)"];
+        return `<div class="insight-row clickable"><div class="insight-tag" style="color:${colors[index % colors.length]}">${tags[index % tags.length]}</div><div class="insight-text">${escapeHtml(message)}</div></div>`;
+      }).join("")
+      : '<div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);text-transform:uppercase">No insights available</div>';
+  }
+
+  revealElements(page);
+}
+
+function getRecurringItems() {
+  if (APP_STATE.recurring.length) {
+    return APP_STATE.recurring;
+  }
+  return APP_STATE.transactions.filter((transaction) => transaction.isRecurring).map((transaction) => ({
+    id: transaction.id,
+    description: transaction.description,
+    amount: transaction.amount,
+    categoryName: transaction.category,
+    frequency: "Detected",
+    nextDueDate: transaction.date,
+    type: transaction.type,
+  }));
+}
+
+function renderAnalyticsPage() {
+  const kpiContainer = document.getElementById("analytics-kpis");
+  const recurringList = document.getElementById("recurring-list");
+  const monthlyTrend = getMonthlyTrendData();
+  const categories = getCategorySeries();
+  const totalIncome = asNumber(APP_STATE.analytics?.totalIncome);
+  const totalExpenses = asNumber(APP_STATE.analytics?.totalExpenses || APP_STATE.analytics?.totalExpense);
+  const netSavings = asNumber(APP_STATE.analytics?.netSavings || totalIncome - totalExpenses);
+  const savingsRate = APP_STATE.analytics?.savingsRate != null
+    ? `${Number(APP_STATE.analytics.savingsRate).toFixed(1)}%`
+    : `${(totalIncome > 0 ? ((netSavings / totalIncome) * 100) : 0).toFixed(1)}%`;
+
+  if (kpiContainer) {
+    kpiContainer.innerHTML = `
+      <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:18px">
+        <div class="stat-card"><div class="stat-label">Total Income</div><div class="stat-value" style="color:var(--acid)">${formatCurrency(totalIncome)}</div><div class="stat-delta up">Current month</div></div>
+        <div class="stat-card"><div class="stat-label">Total Expenses</div><div class="stat-value" style="color:var(--ember)">${formatCurrency(totalExpenses)}</div><div class="stat-delta dn">Current month</div></div>
+        <div class="stat-card"><div class="stat-label">Net Savings</div><div class="stat-value">${formatCurrency(netSavings)}</div><div class="stat-delta up">After spending</div></div>
+        <div class="stat-card"><div class="stat-label">Savings Rate</div><div class="stat-value up">${savingsRate}</div><div class="stat-delta" style="color:var(--muted)">Income retained</div></div>
+      </div>`;
+  }
+
+  renderTrendSvg("analyticsChartSvg", monthlyTrend, [
+    { key: "income", color: "#c8f000" },
+    { key: "expenses", color: "#ff4d00" },
+    { key: "net", color: "#00e5ff" },
+  ]);
+  renderDonutSvg("analyticsDonut", categories, "analytics-donut-center", "analytics-cat-legend");
+
+  if (recurringList) {
+    const items = getRecurringItems();
+    recurringList.innerHTML = items.length
+      ? items.map((item, index) => `
+        <div style="display:grid;grid-template-columns:1.3fr 0.8fr 0.7fr 0.8fr;gap:16px;padding:14px 0;border-bottom:1px solid var(--line2);align-items:center">
+          <div><div style="font-family:var(--font-display);font-size:16px;font-weight:700;text-transform:uppercase">${escapeHtml(item.description)}</div><div style="font-family:var(--font-mono);font-size:8px;color:var(--muted);letter-spacing:0.1em;text-transform:uppercase">${escapeHtml(item.categoryName || item.category || "Recurring")}</div></div>
+          <div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);text-transform:uppercase">${escapeHtml(item.frequency || "Detected")}</div>
+          <div style="font-family:var(--font-mono);font-size:10px;color:var(--muted)">${escapeHtml(formatDateLabel(item.nextDueDate || item.date))}</div>
+          <div style="font-family:var(--font-display);font-size:18px;font-weight:700;color:${normalizeType(item.type) === "INCOME" ? "var(--acid)" : "var(--ember)"}">${formatCurrency(item.amount)}</div>
+        </div>`).join("")
+      : '<div class="page-loading">No recurring transactions found</div>';
+  }
+}
+
+function renderGoalCreatePanel() {
+  const defaultAccountId = APP_STATE.accounts[0]?.id || "";
+  return `
+    <div class="full-panel" style="margin-top:0;margin-bottom:18px">
+      <div class="panel-eyebrow">Goal Planner</div>
+      <div class="panel-title" style="margin-bottom:18px">Create Savings Goal</div>
+      <div style="display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr auto;gap:12px;align-items:end">
+        <div><div style="font-family:var(--font-mono);font-size:8px;color:var(--muted);text-transform:uppercase;margin-bottom:6px">Goal Name</div><input id="goal-name-input" class="ft-input" type="text" placeholder="Emergency Fund" style="width:100%"></div>
+        <div><div style="font-family:var(--font-mono);font-size:8px;color:var(--muted);text-transform:uppercase;margin-bottom:6px">Target Amount</div><input id="goal-target-input" class="ft-input" type="number" placeholder="50000" style="width:100%"></div>
+        <div><div style="font-family:var(--font-mono);font-size:8px;color:var(--muted);text-transform:uppercase;margin-bottom:6px">Monthly Add</div><input id="goal-monthly-input" class="ft-input" type="number" placeholder="5000" style="width:100%"></div>
+        <div><div style="font-family:var(--font-mono);font-size:8px;color:var(--muted);text-transform:uppercase;margin-bottom:6px">Target Date</div><input id="goal-date-input" class="ft-input" type="date" style="width:100%"></div>
+        <div>
+          <input id="goal-account-input" type="hidden" value="${escapeHtml(defaultAccountId)}">
+          <button id="goal-create-btn" class="pg-btn" type="button">CREATE GOAL</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function bindGoalsControls() {
+  document.getElementById("goal-create-btn")?.addEventListener("click", createGoal);
+  document.querySelectorAll("[data-goal-contribute]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      await contributeToGoal(button.dataset.goalContribute);
+    });
+  });
+}
+
+function renderGoalsPage() {
+  const container = document.getElementById("goals-full-list");
+  if (!container) return;
+
+  const totalSaved = APP_STATE.goals.reduce((sum, goal) => sum + asNumber(goal.currentAmount), 0);
+  setText("goals-total-chip", `Total Saved: ${formatCurrency(totalSaved)}`);
+
+  const goalsMarkup = APP_STATE.goals.length
+    ? APP_STATE.goals.map((goal, index) => {
+      const color = goal.color || CATEGORY_COLORS[index % CATEGORY_COLORS.length];
+      const percent = Math.max(0, Math.min(100, Math.round(asNumber(goal.percentComplete))));
+      return `
+        <div class="full-panel" style="margin-top:0">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:20px;margin-bottom:16px">
+            <div>
+              <div style="font-family:var(--font-display);font-size:24px;font-weight:700;text-transform:uppercase;color:${color}">${escapeHtml(goal.name)}</div>
+              <div style="font-family:var(--font-mono);font-size:9px;color:var(--muted);letter-spacing:0.08em;text-transform:uppercase;margin-top:6px">${escapeHtml(goal.description || "Savings target")}</div>
+            </div>
+            <div style="font-family:var(--font-display);font-size:26px;font-weight:900;color:${color}">${percent}%</div>
+          </div>
+          <div style="height:8px;background:var(--line2);margin-bottom:12px"><div style="width:${percent}%;height:100%;background:${color}"></div></div>
+          <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:18px">
+            <div><div style="font-family:var(--font-mono);font-size:8px;color:var(--muted);text-transform:uppercase">Saved</div><div style="font-family:var(--font-display);font-size:20px">${formatCurrency(goal.currentAmount)}</div></div>
+            <div><div style="font-family:var(--font-mono);font-size:8px;color:var(--muted);text-transform:uppercase">Target</div><div style="font-family:var(--font-display);font-size:20px">${formatCurrency(goal.targetAmount)}</div></div>
+            <div><div style="font-family:var(--font-mono);font-size:8px;color:var(--muted);text-transform:uppercase">Remaining</div><div style="font-family:var(--font-display);font-size:20px">${formatCurrency(goal.remaining)}</div></div>
+            <div><div style="font-family:var(--font-mono);font-size:8px;color:var(--muted);text-transform:uppercase">Timeline</div><div style="font-family:var(--font-display);font-size:20px">${goal.monthsToGoal != null ? `${goal.monthsToGoal} mo` : "Open"}</div></div>
+          </div>
+          <div style="display:flex;gap:12px;align-items:end">
+            <div style="flex:1"><div style="font-family:var(--font-mono);font-size:8px;color:var(--muted);text-transform:uppercase;margin-bottom:6px">Add Contribution</div><input id="goal-contribution-${goal.id}" class="ft-input" type="number" placeholder="1000" style="width:100%"></div>
+            <button class="pg-btn" data-goal-contribute="${goal.id}" type="button">ADD FUNDS</button>
+          </div>
+        </div>`;
+    }).join("")
+    : '<div class="full-panel" style="margin-top:0"><div class="page-loading">No savings goals yet. Create one above to start tracking progress.</div></div>';
+
+  container.innerHTML = `${renderGoalCreatePanel()}${goalsMarkup}`;
+  bindGoalsControls();
+}
+
+function renderDashboard() {
+  renderDashboardSummary();
+  renderDashboardInsights();
+  renderDashboardAnomalies();
+  renderDashboardCharts();
+  renderDashboardTransactionTable();
+  revealElements(document.getElementById("page-dashboard"));
+}
+
+function bindUploadZone() {
+  const dropZone = document.getElementById("pdf-drop-zone");
+  if (!dropZone || dropZone.dataset.bound === "true") return;
+  dropZone.dataset.bound = "true";
+  dropZone.addEventListener("click", () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".pdf";
+    input.addEventListener("change", (event) => handlePdfUpload(event.target.files?.[0]));
+    input.click();
+  });
+  dropZone.addEventListener("dragover", (event) => {
+    event.preventDefault();
+    dropZone.style.background = "rgba(200,240,0,0.08)";
+  });
+  dropZone.addEventListener("dragleave", () => {
+    dropZone.style.background = "transparent";
+  });
+  dropZone.addEventListener("drop", (event) => {
+    event.preventDefault();
+    dropZone.style.background = "transparent";
+    handlePdfUpload(event.dataTransfer?.files?.[0]);
+  });
+
+  document.getElementById("upload-account-select")?.addEventListener("change", (event) => {
+    APP_STATE.selectedUploadAccount = event.target.value;
+    console.log("[UPLOAD ACCOUNT]", APP_STATE.selectedUploadAccount);
+  });
+}
+
+function renderAccountsList() {
+  const container = document.getElementById("account-list");
+  if (!container) return;
+
+  if (!APP_STATE.accounts.length) {
+    container.innerHTML = '<div style="font-family:var(--font-mono);font-size:9px;color:var(--muted);letter-spacing:0.08em;text-transform:uppercase">No accounts yet</div>';
+    return;
+  }
+
+  container.innerHTML = APP_STATE.accounts.map((account) => `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border:1px solid var(--line);background:rgba(255,255,255,0.02)">
+      <div>
+        <div style="font-family:var(--font-display);font-size:14px;font-weight:700;letter-spacing:0.05em;text-transform:uppercase">${escapeHtml(account.name)}</div>
+        <div style="font-family:var(--font-mono);font-size:8px;color:var(--muted);letter-spacing:0.08em;text-transform:uppercase">${escapeHtml(account.type)}${account.institution ? ` • ${escapeHtml(account.institution)}` : ""}</div>
+      </div>
+      <div style="font-family:var(--font-display);font-size:18px;font-weight:700;color:var(--acid)">${formatCurrency(account.balance)}</div>
+    </div>`).join("");
+}
+async function loadAccounts() {
+  const accounts = await apiRequest("/accounts", { silent: true });
+  APP_STATE.accounts = Array.isArray(accounts) ? accounts : accounts?.content || [];
+  const accountSelect = document.getElementById("upload-account-select");
+  if (!accountSelect) {
+    renderAccountsList();
+    return;
+  }
+
+  const currentValue = APP_STATE.selectedUploadAccount;
+  accountSelect.innerHTML = '<option value="">-- Choose Account --</option>';
+  APP_STATE.accounts.forEach((account) => {
+    const option = document.createElement("option");
+    option.value = account.id;
+    option.textContent = `${account.name} (${account.type})`;
+    accountSelect.appendChild(option);
+  });
+  if (APP_STATE.accounts.some((account) => String(account.id) === String(currentValue))) {
+    accountSelect.value = currentValue;
+    APP_STATE.selectedUploadAccount = String(currentValue);
+  } else if (APP_STATE.accounts[0]) {
+    APP_STATE.selectedUploadAccount = String(APP_STATE.accounts[0].id);
+    accountSelect.value = APP_STATE.selectedUploadAccount;
+  } else {
+    APP_STATE.selectedUploadAccount = "";
+  }
+  renderAccountsList();
+}
+
+async function createAccount() {
+  const name = document.getElementById("account-name")?.value?.trim();
+  const type = document.getElementById("account-type")?.value;
+  const balance = document.getElementById("account-balance")?.value;
+  const institution = document.getElementById("account-institution")?.value?.trim();
+
+  if (!name) {
+    showFailure("Please enter an account name.");
+    return;
+  }
+
+  const response = await apiRequest("/accounts", {
+    method: "POST",
+    body: {
+      name,
+      type,
+      initialBalance: balance ? Number(balance) : 0,
+      institution: institution || null,
+      currency: "INR",
+      color: "#c8f000",
+    },
+  });
+
+  if (!response?.id) {
+    showFailure("Account creation failed.");
+    return;
+  }
+
+  showToast("Account created successfully.", "success");
+  document.getElementById("account-name").value = "";
+  document.getElementById("account-balance").value = "";
+  document.getElementById("account-institution").value = "";
+  await loadAccounts();
+  APP_STATE.selectedUploadAccount = String(response.id);
+  const accountSelect = document.getElementById("upload-account-select");
+  if (accountSelect) accountSelect.value = String(response.id);
+}
+
+async function handlePdfUpload(file) {
+  if (!file || !file.name?.toLowerCase().endsWith(".pdf")) {
+    showFailure("Please choose a PDF file.");
+    return;
+  }
+  if (!APP_STATE.selectedUploadAccount) {
+    showFailure("Please select an account before uploading.");
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("accountId", APP_STATE.selectedUploadAccount);
+  formData.append("source", "Browser Upload");
+
+  let response = await apiRequest("/upload", { method: "POST", body: formData, silent: true });
+  if (!response) {
+    response = await apiRequest("/statements/upload", { method: "POST", body: formData, silent: true });
+  }
+
+  if (!response) {
+    showFailure("Upload failed. The statement endpoint did not return a usable response.");
+    return;
+  }
+
+  console.log("UPLOAD SUCCESS", response);
+  showToast("Upload successful. Refreshing dashboard and transactions.", "success");
+  await loadDashboardPage(true);
+  await loadTransactionsPage();
+  updateNavigation("dashboard");
+}
+
+async function loadBudgetsPage() {
+  const container = document.getElementById("bud-full-list");
+  if (!container || PAGE_STATE.budgetsLoaded) return;
+
+  const budgets = APP_STATE.budgets.length ? APP_STATE.budgets : await apiRequest("/budgets", { silent: true });
+  PAGE_STATE.budgetsLoaded = true;
+  const items = Array.isArray(budgets) ? budgets : budgets?.content || [];
+  if (!items.length) {
+    container.innerHTML = '<div class="page-loading">No budgets found</div>';
+    return;
+  }
+
+  container.innerHTML = items.map((budget) => {
+    const spent = asNumber(budget.spent || budget.usedAmount);
+    const limit = Math.max(asNumber(budget.limit || budget.amount || budget.totalAmount), 1);
+    const percent = Math.min(Math.round((spent / limit) * 100), 100);
+    const color = percent >= 80 ? "var(--ember)" : percent >= 50 ? "var(--ice)" : "var(--acid)";
+    return `
+      <div class="full-panel" style="margin-top:0;margin-bottom:12px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <span style="font-family:var(--font-display);font-size:16px;font-weight:700;color:${color}">${escapeHtml(budget.name || budget.categoryName || "Budget")}</span>
+          <span style="font-family:var(--font-mono);font-size:10px;color:var(--muted)">${formatCurrency(spent)} / ${formatCurrency(limit)}</span>
+        </div>
+        <div style="height:4px;background:var(--line2);margin-bottom:8px"><div style="height:100%;width:${percent}%;background:${color}"></div></div>
+        <div style="font-family:var(--font-mono);font-size:9px;color:var(--muted)">${percent}% used</div>
+      </div>`;
+  }).join("");
+}
+
+async function createGoal() {
+  const name = document.getElementById("goal-name-input")?.value?.trim();
+  const targetAmount = document.getElementById("goal-target-input")?.value;
+  const monthlyContribution = document.getElementById("goal-monthly-input")?.value;
+  const targetDate = document.getElementById("goal-date-input")?.value;
+  const accountId = document.getElementById("goal-account-input")?.value || APP_STATE.accounts[0]?.id;
+
+  if (!name || !targetAmount) {
+    showFailure("Please enter a goal name and target amount.");
+    return;
+  }
+
+  const response = await apiRequest("/savings-goals", {
+    method: "POST",
+    body: {
+      name,
+      description: `${name} goal`,
+      targetAmount: Number(targetAmount),
+      monthlyContribution: monthlyContribution ? Number(monthlyContribution) : null,
+      targetDate: targetDate || null,
+      accountId: accountId ? Number(accountId) : null,
+      icon: "target",
+      color: "#c8f000",
+    },
+  });
+
+  if (!response?.id) {
+    showFailure("Goal creation failed.");
+    return;
+  }
+
+  showToast("Goal created successfully.", "success");
+  await loadGoalsPage(true);
+  renderOverviewPage();
+}
+
+async function contributeToGoal(goalId) {
+  const input = document.getElementById(`goal-contribution-${goalId}`);
+  const amount = input?.value;
+  if (!amount || Number(amount) <= 0) {
+    showFailure("Enter a valid contribution amount.");
+    return;
+  }
+
+  const response = await apiRequest(`/savings-goals/${goalId}/contribute`, {
+    method: "POST",
+    body: {
+      amount: Number(amount),
+      notes: "Contribution from FinTrack web app",
+    },
+  });
+
+  if (!response?.id) {
+    showFailure("Contribution could not be added.");
+    return;
+  }
+
+  showToast("Contribution added.", "success");
+  await loadGoalsPage(true);
+  renderOverviewPage();
+}
+
+async function refreshAllData() {
+  const [transactionsResponse, analyticsResponse, intelligenceResponse, insightsResponse, budgetsResponse, goalsResponse, recurringResponse] = await Promise.all([
+    apiRequest("/transactions?page=0&size=200"),
+    apiRequest("/analytics/dashboard"),
+    apiRequest("/intelligence/analyze", { method: "POST", silent: true }),
+    apiRequest("/insights", { silent: true }),
+    apiRequest("/budgets", { silent: true }),
+    apiRequest("/savings-goals", { silent: true }),
+    apiRequest("/recurring-transactions", { silent: true }),
+  ]);
+
+  APP_STATE.analytics = analyticsResponse || {};
+  APP_STATE.intelligence = intelligenceResponse || {};
+  APP_STATE.insights = insightsResponse || {};
+  APP_STATE.budgets = Array.isArray(budgetsResponse) ? budgetsResponse : budgetsResponse?.content || [];
+  APP_STATE.goals = Array.isArray(goalsResponse) ? goalsResponse : goalsResponse?.content || [];
+  APP_STATE.recurring = Array.isArray(recurringResponse) ? recurringResponse : recurringResponse?.content || [];
+  APP_STATE.hmmByDate = buildHmmLookup(APP_STATE.intelligence);
+  APP_STATE.transactions = (Array.isArray(transactionsResponse) ? transactionsResponse : transactionsResponse?.content || [])
+    .map(normalizeTransaction)
+    .sort((left, right) => String(right.date).localeCompare(String(left.date)));
+
+  APP_STATE.dataLoaded = true;
+  PAGE_STATE.budgetsLoaded = false;
+  populateCategoryFilters();
+  await loadAccounts();
+  renderTransactionTable();
+  renderOverviewPage();
+  renderAnalyticsPage();
+  renderGoalsPage();
+  renderDashboard();
+}
+
+async function loadDashboardPage(force = false) {
+  if (force || !APP_STATE.dataLoaded) {
+    await refreshAllData();
+  } else {
+    renderDashboard();
+  }
+}
+
+async function loadOverviewPage(force = false) {
+  if (force || !APP_STATE.dataLoaded) {
+    await refreshAllData();
+  } else {
+    renderOverviewPage();
+  }
+}
+
+async function loadTransactionsPage(force = false) {
+  bindUploadZone();
+  if (force || !APP_STATE.dataLoaded) {
+    await refreshAllData();
+  } else {
+    await loadAccounts();
+    renderTransactionTable();
+  }
+}
+
+async function loadAnalyticsPage(force = false) {
+  if (force || !APP_STATE.dataLoaded) {
+    await refreshAllData();
+  } else {
+    renderAnalyticsPage();
+  }
+}
+
+async function loadGoalsPage(force = false) {
+  if (force || !APP_STATE.dataLoaded) {
+    await refreshAllData();
+  } else {
+    renderGoalsPage();
+  }
+}
+
+function bindTransactionControls() {
+  document.getElementById("tx-prev")?.addEventListener("click", () => {
+    APP_STATE.txPage = Math.max(0, APP_STATE.txPage - 1);
+    renderTransactionTable();
+  });
+  document.getElementById("tx-next")?.addEventListener("click", () => {
+    APP_STATE.txPage += 1;
+    renderTransactionTable();
+  });
+  document.getElementById("tx-search")?.addEventListener("input", () => {
+    APP_STATE.txPage = 0;
+    renderTransactionTable();
+  });
+  document.getElementById("tx-filter-type")?.addEventListener("change", () => {
+    APP_STATE.txPage = 0;
+    renderTransactionTable();
+  });
+  document.getElementById("tx-filter-cat")?.addEventListener("change", () => {
+    APP_STATE.txPage = 0;
+    renderTransactionTable();
+  });
+}
+
+function bindDashboardControls() {
+  document.getElementById("dash-search")?.addEventListener("input", (event) => {
+    APP_STATE.dashboardFilters.search = event.target.value;
+    APP_STATE.dashboardFilters.page = 1;
+    renderDashboardTransactionTable();
+  });
+  document.getElementById("dash-catFilter")?.addEventListener("change", (event) => {
+    APP_STATE.dashboardFilters.category = event.target.value;
+    APP_STATE.dashboardFilters.page = 1;
+    renderDashboardTransactionTable();
+  });
+  document.getElementById("dash-typeFilter")?.addEventListener("change", (event) => {
+    APP_STATE.dashboardFilters.type = normalizeType(event.target.value);
+    APP_STATE.dashboardFilters.page = 1;
+    renderDashboardTransactionTable();
+  });
+  document.getElementById("dash-stateFilter")?.addEventListener("change", (event) => {
+    APP_STATE.dashboardFilters.state = event.target.value;
+    APP_STATE.dashboardFilters.page = 1;
+    renderDashboardTransactionTable();
+  });
+}
+
+function bindNavigation() {
+  document.querySelectorAll(".tn[data-page], .nav-icon[data-page]").forEach((element) => {
+    element.addEventListener("click", async () => {
+      const page = element.dataset.page;
+      updateNavigation(page);
+      if (page === "overview") await loadOverviewPage();
+      if (page === "dashboard") await loadDashboardPage();
+      if (page === "transactions") await loadTransactionsPage();
+      if (page === "budgets") await loadBudgetsPage();
+      if (page === "analytics") await loadAnalyticsPage();
+      if (page === "goals") await loadGoalsPage();
+    });
+  });
+}
+
+function bindAccountControls() {
+  document.getElementById("create-account-btn")?.addEventListener("click", createAccount);
+  bindUploadZone();
+}
+
+function bindTopbarControls() {
+  if (document.getElementById("logout-btn")?.dataset.bound === "true") return;
+  const logoutButton = document.getElementById("logout-btn");
+  if (logoutButton) {
+    logoutButton.dataset.bound = "true";
+    logoutButton.addEventListener("click", async () => {
+      await logout();
+    });
+  }
+  renderUserChip();
+}
+
+async function handleLogin(email, password) {
+  const submitButton = document.getElementById("login-submit");
+  const normalizedEmail = String(email || "").trim().toLowerCase();
+  const normalizedPassword = String(password || "");
+
+  if (!normalizedEmail || !normalizedPassword) {
+    showFailure("Enter your email and password.");
+    return;
+  }
+
+  setButtonBusy(submitButton, true, "Login", "Signing In...");
+  try {
+    const response = await apiRequest("/auth/login", {
+      method: "POST",
+      body: { email: normalizedEmail, password: normalizedPassword },
+    });
+    if (!response?.accessToken) {
+      showFailure("Login failed. Please verify your credentials.");
+      return;
+    }
+
+    console.log("LOGIN SUCCESS");
+    saveAuthState(response.accessToken, normalizeAuthUser(response.user, { email: normalizedEmail }));
+    showToast("Login successful.", "success");
+    location.reload();
+  } finally {
+    setButtonBusy(submitButton, false, "Login", "Signing In...");
+  }
+}
+
+async function handleRegister(fullName, email, password) {
+  const submitButton = document.getElementById("register-submit");
+  const normalizedName = String(fullName || "").trim();
+  const normalizedEmail = String(email || "").trim().toLowerCase();
+  const normalizedPassword = String(password || "").trim();
+
+  if (!normalizedName || !normalizedEmail || !normalizedPassword) {
+    showFailure("Complete all registration fields.");
+    return;
+  }
+  if (normalizedPassword.length < 8) {
+    showFailure("Password must be at least 8 characters.");
+    return;
+  }
+
+  setButtonBusy(submitButton, true, "Register", "Creating...");
+  try {
+    const response = await apiRequest("/auth/register", {
+      method: "POST",
+      body: { fullName: normalizedName, email: normalizedEmail, password: normalizedPassword, currency: "INR" },
+    });
+    if (!response?.accessToken) {
+      showFailure("Registration failed.");
+      return;
+    }
+
+    console.log("LOGIN SUCCESS");
+    saveAuthState(response.accessToken, normalizeAuthUser(response.user, { fullName: normalizedName, email: normalizedEmail }));
+    showToast("Registration successful.", "success");
+    location.reload();
+  } finally {
+    setButtonBusy(submitButton, false, "Register", "Creating...");
+  }
+}
+
+async function logout() {
+  const logoutButton = document.getElementById("logout-btn");
+  setButtonBusy(logoutButton, true, "Logout", "Signing Out...");
+  await apiRequest("/auth/logout", { method: "POST", silent: true });
+  clearAuth();
+  location.reload();
+}
+
+window.logout = logout;
+window.handlePdfUpload = handlePdfUpload;
+
+window.addEventListener("load", async () => {
+  console.log("APP INIT");
+  updateTransactionFilterLabels();
+  wireCursor();
+  bindNavigation();
+  bindTransactionControls();
+  bindDashboardControls();
+  bindAccountControls();
+  loadAuthState();
+
+  if (!APP_STATE.token) {
+    goToLoginPage();
+    return;
+  }
+
+  bindTopbarControls();
+  bindUploadZone();
+  updateNavigation("dashboard");
+  try {
+    await loadDashboardPage(true);
+    await loadTransactionsPage();
+  } catch (error) {
+    console.error(error);
+    showFailure("The frontend could not load dashboard data from the backend.");
+  }
+});

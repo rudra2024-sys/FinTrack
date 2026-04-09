@@ -1,0 +1,1042 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>FINTRACK - Finance OS</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,300;0,400;0,600;0,700;0,900;1,700&family=Barlow:wght@300;400;500&family=IBM+Plex+Mono:wght@300;400;500&display=swap" rel="stylesheet"/>
+
+<style>
+:root {
+  --bg:       #0a0a08;
+  --surface:  #0f0f0c;
+  --card:     #131310;
+  --line:     rgba(255,255,255,0.07);
+  --line2:    rgba(255,255,255,0.04);
+  --acid:     #c8f000;
+  --ember:    #ff4d00;
+  --ice:      #00e5ff;
+  --offwhite: #e8e4dc;
+  --muted:    #5a5a52;
+  --dim:      #2a2a26;
+  --font-display: 'Barlow Condensed', sans-serif;
+  --font-body:    'Barlow', sans-serif;
+  --font-mono:    'IBM Plex Mono', monospace;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--offwhite);
+  font-family: var(--font-body);
+  overflow-x: hidden;
+  cursor: none;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+body::before {
+  content: '';
+  position: fixed; inset: 0; z-index: 8000;
+  pointer-events: none; opacity: 0.028;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 600 600' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 200px;
+}
+
+/* â”€â”€ CURSOR â”€â”€ */
+#cursor {
+  position: fixed; z-index: 9999; pointer-events: none;
+  width: 8px; height: 8px;
+  background: var(--acid);
+  border-radius: 0;
+  transform-origin: center;
+  mix-blend-mode: difference;
+  transition: width 0.2s, height 0.2s;
+}
+#cursor-outer {
+  position: fixed; z-index: 9998; pointer-events: none;
+  width: 32px; height: 32px;
+  border: 1px solid rgba(200,240,0,0.3);
+  border-radius: 0;
+  transition: transform 0.14s ease;
+}
+body:has(a:hover) #cursor,
+body:has(.clickable:hover) #cursor { width: 14px; height: 14px; }
+
+/* â”€â”€ SCROLLBAR â”€â”€ */
+::-webkit-scrollbar { width: 2px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--dim); }
+::selection { background: var(--acid); color: #000; }
+
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+   LAYOUT
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+#shell { display: flex; min-height: 100vh; }
+
+/* â”€â”€ SIDEBAR â”€â”€ */
+#sidebar {
+  width: 60px;
+  border-right: 1px solid var(--line);
+  display: flex; flex-direction: column; align-items: center;
+  padding: 24px 0; gap: 6px;
+  position: fixed; left: 0; top: 0; bottom: 0; z-index: 200;
+  background: var(--bg);
+}
+.logo-vert {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  transform: rotate(180deg);
+  font-family: var(--font-display);
+  font-size: 13px; font-weight: 700;
+  letter-spacing: 0.3em;
+  color: var(--offwhite);
+  margin-bottom: 28px;
+  text-transform: uppercase;
+}
+.logo-vert span { color: var(--acid); }
+
+.nav-icon {
+  width: 36px; height: 36px;
+  display: flex; align-items: center; justify-content: center;
+  border: 1px solid transparent;
+  cursor: pointer; color: var(--muted);
+  transition: color 0.15s, border-color 0.15s;
+  position: relative;
+}
+.nav-icon:hover, .nav-icon.active { color: var(--offwhite); border-color: var(--line); }
+.nav-icon.active::after {
+  content: '';
+  position: absolute; left: -1px;
+  width: 2px; height: 16px;
+  background: var(--acid);
+}
+.nav-icon svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.5; }
+.nav-tooltip {
+  position: absolute; left: 68px; top: 50%; transform: translateY(-50%);
+  background: var(--card); border: 1px solid var(--line);
+  font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.15em;
+  color: var(--offwhite); text-transform: uppercase;
+  padding: 5px 10px; white-space: nowrap;
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.15s;
+  z-index: 300;
+}
+.nav-icon:hover .nav-tooltip { opacity: 1; }
+
+/* â”€â”€ MAIN â”€â”€ */
+#main { margin-left: 60px; flex: 1; min-width: 0; }
+
+/* â”€â”€ TOPBAR â”€â”€ */
+#topbar {
+  height: 56px;
+  border-bottom: 1px solid var(--line);
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 40px;
+  position: sticky; top: 0; z-index: 100;
+  background: rgba(10,10,8,0.95);
+  backdrop-filter: blur(20px);
+}
+.tb-left { display: flex; align-items: center; gap: 32px; }
+.tb-label {
+  font-family: var(--font-mono);
+  font-size: 9px; letter-spacing: 0.2em;
+  color: var(--muted); text-transform: uppercase;
+}
+.tb-sep { width: 1px; height: 18px; background: var(--line); }
+.tb-nav { display: flex; gap: 0; }
+.tn {
+  font-family: var(--font-mono);
+  font-size: 9px; letter-spacing: 0.15em; text-transform: uppercase;
+  padding: 6px 16px; cursor: pointer; color: var(--muted);
+  border: 1px solid transparent; border-radius: 0;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.tn.on {
+  color: var(--acid);
+  border-color: rgba(200,240,0,0.2);
+  background: rgba(200,240,0,0.04);
+}
+.tn:hover:not(.on) { color: var(--offwhite); }
+.tb-right { display: flex; align-items: center; gap: 20px; }
+.live-ind {
+  display: flex; align-items: center; gap: 7px;
+  font-family: var(--font-mono); font-size: 9px;
+  letter-spacing: 0.2em; color: var(--muted); text-transform: uppercase;
+}
+.pulse {
+  width: 5px; height: 5px; border-radius: 50%;
+  background: var(--acid);
+  box-shadow: 0 0 8px var(--acid);
+  animation: pulse 2s ease-in-out infinite;
+}
+@keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.3;} }
+.clock { font-family: var(--font-mono); font-size: 12px; color: var(--dim); letter-spacing: 0.1em; }
+.user-chip {
+  display: flex; align-items: center; gap: 10px;
+  border: 1px solid var(--line);
+  padding: 5px 12px; cursor: pointer;
+  transition: border-color 0.15s;
+}
+.user-chip:hover { border-color: var(--dim); }
+.user-chip span { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.15em; color: var(--muted); text-transform: uppercase; }
+.user-dot { width: 20px; height: 20px; background: var(--dim); display: flex; align-items: center; justify-content: center; font-family: var(--font-display); font-size: 11px; color: var(--acid); font-weight: 700; }
+.topbar-action {
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--muted);
+  padding: 7px 12px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.topbar-action:hover,
+.topbar-action:focus-visible {
+  border-color: var(--acid);
+  color: var(--acid);
+  outline: none;
+}
+.topbar-action:active {
+  background: rgba(200, 240, 0, 0.08);
+}
+
+/* â”€â”€ BRAND â”€â”€ */
+.brand-name {
+  display: flex; align-items: center; gap: 0;
+  position: relative; overflow: hidden;
+  border: 1px solid var(--line);
+  padding: 5px 14px 5px 12px; cursor: default;
+}
+.brand-name::before {
+  content: ''; position: absolute; left: 0; top: 0; bottom: 0;
+  width: 2px; background: var(--acid);
+  box-shadow: 0 0 8px var(--acid), 0 0 20px var(--acid);
+}
+.brand-name::after {
+  content: ''; position: absolute; top: 0; left: -100%; width: 100%; height: 100%;
+  background: linear-gradient(90deg, transparent 0%, rgba(200,240,0,0.06) 50%, transparent 100%);
+  animation: brand-sweep 4s ease-in-out infinite;
+}
+@keyframes brand-sweep { 0%{left:-100%;} 40%,100%{left:120%;} }
+.brand-letters {
+  font-family: var(--font-display); font-size: 15px; font-weight: 900;
+  letter-spacing: 0.22em; text-transform: uppercase; color: var(--offwhite);
+  position: relative; z-index: 1;
+  animation: brand-chroma 7s ease-in-out infinite;
+}
+.brand-letters .accent { color: var(--acid); }
+@keyframes brand-chroma {
+  0%,85%,100% { text-shadow: none; }
+  87% { text-shadow: 2px 0 var(--ember), -2px 0 var(--ice); letter-spacing: 0.24em; }
+  89% { text-shadow: none; letter-spacing: 0.22em; }
+  91% { text-shadow: -3px 0 var(--ember), 3px 0 var(--acid); }
+  93% { text-shadow: none; }
+}
+.brand-tag {
+  font-family: var(--font-mono); font-size: 7px; letter-spacing: 0.2em;
+  color: var(--muted); text-transform: uppercase;
+  margin-left: 10px; padding-left: 10px;
+  border-left: 1px solid var(--line); line-height: 1;
+  position: relative; z-index: 1;
+}
+.brand-tag span { display: block; color: var(--acid); font-size: 8px; letter-spacing: 0.1em; margin-bottom: 1px; }
+
+/* â”€â”€ CONTENT â”€â”€ */
+#content { padding: 0 40px 60px; }
+
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+   PAGE SYSTEM
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+.page { display: none; }
+.page.active { display: block; }
+
+.page-hero {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  padding: 40px 0 28px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 0;
+}
+.page-eyebrow {
+  font-family: var(--font-mono); font-size: 9px;
+  letter-spacing: 0.25em; color: var(--muted); text-transform: uppercase;
+  margin-bottom: 8px; display: flex; align-items: center; gap: 14px;
+}
+.page-eyebrow::before { content: '-'; color: var(--acid); }
+.page-title {
+  font-family: var(--font-display); font-size: clamp(36px, 5vw, 60px);
+  font-weight: 900; letter-spacing: 0.02em; text-transform: uppercase;
+  line-height: 1; color: var(--offwhite);
+}
+.page-hero-right { display: flex; align-items: center; gap: 16px; padding-bottom: 4px; }
+
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+   HERO SECTION (Overview)
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+.hero-section { padding: 48px 0 0; border-bottom: 1px solid var(--line); }
+.hero-meta {
+  display: flex; align-items: center; gap: 20px;
+  font-family: var(--font-mono); font-size: 9px;
+  letter-spacing: 0.2em; color: var(--muted); text-transform: uppercase;
+  margin-bottom: 16px;
+}
+.hero-meta::before { content: ''; width: 28px; height: 1px; background: var(--acid); }
+.hero-meta-sep { color: var(--dim); }
+.hero-numblock { display: flex; align-items: flex-end; gap: 0; margin-bottom: 24px; }
+.hero-currency { font-family: var(--font-display); font-size: clamp(32px,5vw,52px); font-weight: 300; color: var(--muted); line-height: 1; margin-bottom: 14px; margin-right: 8px; letter-spacing: 0.02em; }
+.hero-number { font-family: var(--font-display); font-size: clamp(80px,14vw,160px); font-weight: 900; line-height: 0.85; letter-spacing: -0.02em; color: var(--offwhite); }
+.hero-number .frac { font-size: 0.35em; color: var(--muted); font-weight: 300; }
+.hero-badge { margin-left: 28px; margin-bottom: 18px; display: flex; flex-direction: column; gap: 6px; }
+.badge-delta {
+  font-family: var(--font-mono); font-size: 11px; color: var(--acid); letter-spacing: 0.05em;
+  border: 1px solid rgba(200,240,0,0.2); padding: 4px 10px; display: inline-block;
+  background: rgba(200,240,0,0.04);
+}
+.badge-label { font-family: var(--font-mono); font-size: 9px; color: var(--muted); letter-spacing: 0.15em; text-transform: uppercase; }
+.hero-stats-row { display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid var(--line); }
+.hs-item { padding: 20px 0 24px; border-right: 1px solid var(--line); position: relative; }
+.hs-item:last-child { border-right: none; }
+.hs-item + .hs-item { padding-left: 32px; }
+.hs-label { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.2em; color: var(--muted); text-transform: uppercase; margin-bottom: 8px; display: flex; align-items: center; gap: 10px; }
+.hs-label::before { content: '-'; color: var(--dim); font-size: 10px; }
+.hs-value { font-family: var(--font-display); font-size: clamp(28px,3.5vw,44px); font-weight: 700; letter-spacing: -0.01em; line-height: 1; }
+.hs-delta { font-family: var(--font-mono); font-size: 10px; margin-top: 6px; letter-spacing: 0.05em; }
+.up { color: var(--acid); }
+.dn { color: var(--ember); }
+
+/* â”€â”€ TICKER â”€â”€ */
+.ticker-wrap { border-bottom: 1px solid var(--line); overflow: hidden; position: relative; background: var(--surface); }
+.ticker-wrap::before, .ticker-wrap::after { content: ''; position: absolute; top: 0; bottom: 0; width: 60px; z-index: 2; pointer-events: none; }
+.ticker-wrap::before { left: 0; background: linear-gradient(90deg, var(--surface), transparent); }
+.ticker-wrap::after  { right: 0; background: linear-gradient(-90deg, var(--surface), transparent); }
+.ticker-track { display: flex; gap: 0; white-space: nowrap; animation: ticker 36s linear infinite; padding: 10px 0; }
+.ticker-track:hover { animation-play-state: paused; }
+@keyframes ticker { from{transform:translateX(0)} to{transform:translateX(-50%)} }
+.tick { display: inline-flex; align-items: center; gap: 12px; padding: 0 40px; border-right: 1px solid var(--line); font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.08em; }
+.tick-name { font-family: var(--font-display); font-size: 13px; font-weight: 700; color: var(--offwhite); letter-spacing: 0.08em; text-transform: uppercase; }
+.tick-val { color: var(--muted); }
+
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+   GRID LAYOUTS
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+.grid-2 { display: grid; grid-template-columns: 1fr 380px; border-bottom: 1px solid var(--line); }
+.grid-2-equal { display: grid; grid-template-columns: 1fr 1fr; }
+.grid-2-std { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+.grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; }
+.grid-3-std { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 24px; }
+.grid-4-std { display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px; }
+.grid-5-std { display: grid; grid-template-columns: repeat(5, 1fr); gap: 24px; }
+
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+   PANEL
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+.panel {
+  padding: 32px; position: relative;
+  border-right: 1px solid var(--line);
+  transition: background 0.2s;
+}
+.panel:last-child { border-right: none; }
+.panel-bottom { border-top: 1px solid var(--line); }
+.panel-card { padding: 32px; border: 1px solid var(--line); background: var(--card); transition: background 0.2s; }
+.panel-eyebrow {
+  font-family: var(--font-mono); font-size: 9px;
+  letter-spacing: 0.25em; color: var(--muted); text-transform: uppercase; margin-bottom: 20px;
+  display: flex; align-items: center; gap: 14px;
+}
+.panel-eyebrow::after { content: ''; flex: 1; height: 1px; background: var(--line); }
+.panel-title { font-family: var(--font-display); font-size: 22px; font-weight: 700; letter-spacing: 0.02em; text-transform: uppercase; color: var(--offwhite); margin-bottom: 24px; }
+
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+   STAT CARDS (Dashboard page)
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+.stat-card { padding: 28px; border: 1px solid var(--line); background: var(--card); position: relative; overflow: hidden; }
+.stat-label { font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.2em; color: var(--muted); text-transform: uppercase; margin-bottom: 12px; }
+.stat-value { font-family: var(--font-display); font-size: clamp(24px,3vw,42px); font-weight: 900; letter-spacing: -0.01em; line-height: 1; margin-bottom: 8px; }
+.stat-delta { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; }
+
+/* â”€â”€ STAT STRIP (budgets page) â”€â”€ */
+.stat-strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px,1fr)); gap: 0; margin-top: 24px; border: 1px solid var(--line); }
+.stat-strip-lg { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px,1fr)); gap: 0; border: 1px solid var(--line); }
+.stat-cell { padding: 24px 28px; border-right: 1px solid var(--line); }
+.stat-cell:last-child { border-right: none; }
+.stat-cell-label { font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.2em; color: var(--muted); text-transform: uppercase; margin-bottom: 10px; }
+.stat-cell-val { font-family: var(--font-display); font-size: 32px; font-weight: 900; letter-spacing: -0.01em; line-height: 1; }
+.stat-cell-delta { font-family: var(--font-mono); font-size: 9px; margin-top: 6px; letter-spacing: 0.05em; }
+
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+   CHART
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+.chart-container { position: relative; height: 220px; }
+.chart-container-lg { position: relative; height: 280px; margin-bottom: 20px; }
+#chartSvg { width: 100%; height: 100%; overflow: visible; }
+.chart-legend { display: flex; gap: 24px; margin-bottom: 20px; }
+.leg { display: flex; align-items: center; gap: 8px; font-family: var(--font-mono); font-size: 9px; color: var(--muted); letter-spacing: 0.12em; text-transform: uppercase; }
+.leg-line { width: 20px; height: 1px; }
+
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+   DONUT
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+.donut-wrap { display: flex; align-items: center; gap: 32px; margin-top: 8px; }
+.donut-center-text { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.donut-big { font-family: var(--font-display); font-size: 22px; font-weight: 700; line-height: 1; }
+.donut-sub { font-family: var(--font-mono); font-size: 8px; color: var(--muted); letter-spacing: 0.15em; text-transform: uppercase; margin-top: 3px; }
+.donut-legend { flex: 1; display: flex; flex-direction: column; gap: 10px; }
+.dl-item { display: flex; align-items: center; justify-content: space-between; }
+.dl-left { display: flex; align-items: center; gap: 8px; font-family: var(--font-mono); font-size: 10px; color: var(--muted); }
+.dl-dot { width: 6px; height: 6px; flex-shrink: 0; }
+.dl-val { font-family: var(--font-display); font-size: 15px; font-weight: 700; color: var(--offwhite); }
+
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+   TRANSACTIONS
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+.tx-header { display: grid; grid-template-columns: 1fr 80px 90px; padding: 0 0 10px; border-bottom: 1px solid var(--line2); font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.2em; color: var(--muted); text-transform: uppercase; }
+.tx-row { display: grid; grid-template-columns: 1fr 80px 90px; padding: 13px 0; border-bottom: 1px solid var(--line2); align-items: center; cursor: pointer; transition: padding-left 0.2s; }
+.tx-row:hover { padding-left: 8px; background: rgba(255,255,255,0.01); }
+.tx-name { font-family: var(--font-display); font-size: 15px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--offwhite); }
+.tx-cat { font-family: var(--font-mono); font-size: 9px; color: var(--muted); letter-spacing: 0.1em; margin-top: 2px; text-transform: uppercase; }
+.tx-date { font-family: var(--font-mono); font-size: 9px; color: var(--muted); letter-spacing: 0.08em; }
+.tx-amount { font-family: var(--font-display); font-size: 16px; font-weight: 700; letter-spacing: 0.02em; text-align: right; }
+
+.tx-full-header { display: grid; grid-template-columns: 40px 1fr 140px 140px 100px 120px; padding: 0 0 12px; border-bottom: 1px solid var(--line); font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.2em; color: var(--muted); text-transform: uppercase; gap: 12px; }
+.tx-full-row { display: grid; grid-template-columns: 40px 1fr 140px 140px 100px 120px; padding: 14px 0; border-bottom: 1px solid var(--line2); align-items: center; gap: 12px; cursor: pointer; transition: background 0.15s, padding-left 0.15s; }
+.tx-full-row:hover { background: rgba(255,255,255,0.015); padding-left: 6px; }
+.tx-row-num { font-family: var(--font-mono); font-size: 9px; color: var(--muted); }
+.tx-full-name { font-family: var(--font-display); font-size: 15px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--offwhite); }
+.tx-full-sub { font-family: var(--font-mono); font-size: 8px; color: var(--muted); letter-spacing: 0.08em; margin-top: 2px; }
+.tx-full-cat, .tx-full-acc { font-family: var(--font-mono); font-size: 9px; color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase; }
+.tx-full-date { font-family: var(--font-mono); font-size: 9px; color: var(--muted); }
+.tx-full-amount { font-family: var(--font-display); font-size: 17px; font-weight: 800; letter-spacing: 0.01em; text-align: right; }
+
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+   BUDGETS
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+.bud-row { padding: 16px 0; border-bottom: 1px solid var(--line2); }
+.bud-row:last-child { border-bottom: none; }
+.bud-meta { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
+.bud-name { font-family: var(--font-display); font-size: 14px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--offwhite); }
+.bud-nums { font-family: var(--font-mono); font-size: 9px; color: var(--muted); letter-spacing: 0.08em; }
+.bud-track { height: 2px; background: var(--dim); position: relative; overflow: hidden; }
+.bud-fill { height: 100%; width: 0%; transition: width 1.6s cubic-bezier(0.22,1,0.36,1); position: relative; }
+.bud-fill::after { content: ''; position: absolute; top: 0; left: -80%; width: 80%; height: 100%; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.6), transparent); animation: shim 3s ease-in-out infinite; }
+@keyframes shim { 0%{left:-80%} 60%,100%{left:160%} }
+.bud-status { font-family: var(--font-mono); font-size: 9px; margin-top: 6px; letter-spacing: 0.1em; text-transform: uppercase; }
+.bud-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 0; padding: 0; }
+.bud-card { padding: 28px 32px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); position: relative; overflow: hidden; }
+.bud-card-name { font-family: var(--font-display); font-size: 20px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 6px; }
+.bud-card-nums { font-family: var(--font-mono); font-size: 9px; color: var(--muted); letter-spacing: 0.1em; margin-bottom: 16px; }
+.bud-card-bar-track { height: 3px; background: var(--dim); overflow: hidden; margin-bottom: 10px; }
+.bud-card-bar-fill { height: 100%; width: 0%; transition: width 1.4s cubic-bezier(0.22,1,0.36,1); }
+.bud-card-footer { display: flex; justify-content: space-between; align-items: baseline; }
+.bud-card-pct { font-family: var(--font-display); font-size: 42px; font-weight: 900; line-height: 1; }
+.bud-card-rem { font-family: var(--font-mono); font-size: 9px; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; text-align: right; }
+.month-label { font-family: var(--font-display); font-size: 28px; font-weight: 900; letter-spacing: 0.08em; color: var(--acid); text-transform: uppercase; }
+
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+   GOALS
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+.goal-row { display: flex; align-items: center; gap: 20px; padding: 16px 0; border-bottom: 1px solid var(--line2); cursor: pointer; transition: padding-left 0.2s; }
+.goal-row:last-child { border-bottom: none; }
+.goal-row:hover { padding-left: 6px; }
+.goal-index { font-family: var(--font-display); font-size: 36px; font-weight: 900; color: var(--dim); line-height: 1; width: 40px; flex-shrink: 0; }
+.goal-body { flex: 1; }
+.goal-name { font-family: var(--font-display); font-size: 14px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--offwhite); margin-bottom: 8px; }
+.goal-bar-track { height: 2px; background: var(--dim); overflow: hidden; }
+.goal-bar-fill { height: 100%; width: 0%; transition: width 1.6s cubic-bezier(0.22,1,0.36,1); }
+.goal-right { text-align: right; }
+.goal-pct { font-family: var(--font-display); font-size: 28px; font-weight: 900; line-height: 1; }
+.goal-eta { font-family: var(--font-mono); font-size: 8px; color: var(--muted); letter-spacing: 0.12em; text-transform: uppercase; margin-top: 3px; }
+.goals-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 0; padding: 0; }
+.goal-card { padding: 32px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); position: relative; overflow: hidden; cursor: pointer; transition: background 0.2s; }
+.goal-card:hover { background: rgba(255,255,255,0.012); }
+.goal-card-idx { font-family: var(--font-display); font-size: 56px; font-weight: 900; color: var(--dim); line-height: 1; margin-bottom: 8px; }
+.goal-card-name { font-family: var(--font-display); font-size: 22px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 4px; }
+.goal-card-sub { font-family: var(--font-mono); font-size: 9px; color: var(--muted); letter-spacing: 0.1em; margin-bottom: 20px; }
+.goal-card-bar-track { height: 2px; background: var(--dim); overflow: hidden; margin-bottom: 16px; }
+.goal-card-bar-fill { height: 100%; width: 0%; transition: width 1.4s cubic-bezier(0.22,1,0.36,1); }
+.goal-card-footer { display: flex; justify-content: space-between; align-items: baseline; }
+.goal-card-pct { font-family: var(--font-display); font-size: 52px; font-weight: 900; line-height: 1; }
+.goal-card-eta { font-family: var(--font-mono); font-size: 8px; color: var(--muted); letter-spacing: 0.12em; text-transform: uppercase; text-align: right; }
+
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+   INSIGHTS
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+.insight-row { padding: 14px 0; border-bottom: 1px solid var(--line2); display: grid; grid-template-columns: 48px 1fr; gap: 12px; align-items: start; cursor: pointer; transition: background 0.15s; }
+.insight-row:last-child { border-bottom: none; }
+.insight-row:hover { background: rgba(255,255,255,0.01); }
+.insight-tag { font-family: var(--font-display); font-size: 10px; font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase; padding: 3px 0; }
+.insight-text { font-size: 12px; color: var(--muted); line-height: 1.6; letter-spacing: 0.01em; }
+.insight-text strong { color: var(--offwhite); font-weight: 500; }
+
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+   ACCOUNTS
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+.account-row { display: flex; align-items: center; justify-content: space-between; padding: 14px 0; border-bottom: 1px solid var(--line2); }
+.account-row:last-child { border-bottom: none; }
+.acc-left { display: flex; align-items: center; gap: 12px; }
+.acc-dot { width: 6px; height: 6px; flex-shrink: 0; }
+.acc-name { font-family: var(--font-display); font-size: 14px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+.acc-type { font-family: var(--font-mono); font-size: 9px; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; }
+.acc-val { font-family: var(--font-display); font-size: 18px; font-weight: 900; letter-spacing: -0.01em; }
+
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+   ANALYTICS / DASHBOARD PAGE
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+.alert-box { padding: 16px 20px; margin-bottom: 12px; border-left: 3px solid transparent; background: rgba(255,255,255,0.04); }
+.alert-warning { border-left-color: var(--ember); }
+.alert-success { border-left-color: var(--acid); }
+.alert-info { border-left-color: var(--ice); }
+
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+   RECURRING
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+.rec-row { display: grid; grid-template-columns: 1fr 120px 120px 100px; padding: 14px 0; border-bottom: 1px solid var(--line2); align-items: center; gap: 12px; }
+.rec-row:last-child { border-bottom: none; }
+.rec-name { font-family: var(--font-display); font-size: 15px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+.rec-sub { font-family: var(--font-mono); font-size: 8px; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; margin-top: 2px; }
+.rec-freq { font-family: var(--font-mono); font-size: 9px; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; }
+.rec-next { font-family: var(--font-mono); font-size: 9px; color: var(--muted); }
+.rec-amount { font-family: var(--font-display); font-size: 18px; font-weight: 800; text-align: right; }
+
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+   FULL PANEL / PAGINATION
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+.full-panel { border: 1px solid var(--line); margin-top: 24px; background: var(--card); padding: 28px 32px; }
+.pagination-row { display: flex; align-items: center; gap: 16px; justify-content: flex-end; padding-top: 20px; margin-top: 4px; border-top: 1px solid var(--line2); }
+.pg-btn { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.2em; border: 1px solid var(--line); background: transparent; color: var(--muted); padding: 6px 16px; cursor: pointer; transition: all 0.15s; }
+.pg-btn:hover:not(:disabled) { border-color: var(--acid); color: var(--acid); }
+.pg-btn:disabled { opacity: 0.3; cursor: default; }
+.pg-info { font-family: var(--font-mono); font-size: 9px; color: var(--muted); letter-spacing: 0.1em; }
+
+/* â”€â”€ FILTERS â”€â”€ */
+.filter-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.ft-select, .ft-input {
+  background: var(--card); border: 1px solid var(--line);
+  color: var(--offwhite); font-family: var(--font-mono);
+  font-size: 10px; letter-spacing: 0.1em;
+  padding: 7px 12px; outline: none;
+  transition: border-color 0.15s;
+  -webkit-appearance: none; border-radius: 0;
+}
+.ft-select:focus, .ft-input:focus { border-color: rgba(200,240,0,0.4); }
+.ft-select option { background: var(--card); }
+.ft-input { width: 220px; }
+.ft-input::placeholder { color: var(--muted); }
+
+/* â”€â”€ LOADING â”€â”€ */
+.page-loading { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.2em; color: var(--muted); text-transform: uppercase; padding: 48px 0; text-align: center; }
+.blink { animation: blink 1s step-end infinite; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+.stat-chip { font-family: var(--font-display); font-size: 20px; font-weight: 700; color: var(--acid); letter-spacing: 0.04em; }
+
+/* â”€â”€ REVEAL â”€â”€ */
+.reveal { opacity: 0; transform: translateY(20px); }
+
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+   RESPONSIVE
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+@media (max-width: 1300px) {
+  .grid-5-std { grid-template-columns: repeat(3, 1fr); }
+  .grid-4-std { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 1100px) {
+  .grid-2 { grid-template-columns: 1fr; }
+  .grid-3 { grid-template-columns: 1fr 1fr; }
+  .grid-3-std { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 900px) {
+  .grid-4-std, .grid-3-std { grid-template-columns: 1fr 1fr; }
+  .grid-5-std { grid-template-columns: 1fr 1fr; }
+  .grid-2-std { grid-template-columns: 1fr; }
+}
+@media (max-width: 720px) {
+  #main { margin-left: 0; }
+  #sidebar { display: none; }
+  #content { padding: 0 20px 40px; }
+  #topbar { padding: 0 20px; }
+  .hero-number { font-size: 72px; }
+  .grid-3 { grid-template-columns: 1fr; }
+  .grid-2-equal { grid-template-columns: 1fr; }
+  .hero-stats-row { grid-template-columns: 1fr 1fr; }
+  .grid-4-std, .grid-5-std { grid-template-columns: 1fr; }
+  .tx-full-header, .tx-full-row { grid-template-columns: 40px 1fr 100px 90px; }
+}
+</style>
+</head>
+<body>
+
+<div id="cursor"></div>
+<div id="cursor-outer"></div>
+
+<div id="shell">
+
+  <!-- SIDEBAR -->
+  <nav id="sidebar">
+    <div class="logo-vert">FIN<span>T</span>RACK</div>
+
+    <div class="nav-icon active clickable" data-page="overview" title="Overview">
+      <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="0.5"/><rect x="14" y="3" width="7" height="7" rx="0.5"/><rect x="3" y="14" width="7" height="7" rx="0.5"/><rect x="14" y="14" width="7" height="7" rx="0.5"/></svg>
+      <span class="nav-tooltip">Overview</span>
+    </div>
+    <div class="nav-icon clickable" data-page="transactions" title="Transactions">
+      <svg viewBox="0 0 24 24"><path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4"/></svg>
+      <span class="nav-tooltip">Transactions</span>
+    </div>
+    <div class="nav-icon clickable" data-page="budgets" title="Budgets">
+      <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="0.5"/><path d="M8 21h8M12 17v4"/></svg>
+      <span class="nav-tooltip">Budgets</span>
+    </div>
+    <div class="nav-icon clickable" data-page="goals" title="Goals">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+      <span class="nav-tooltip">Goals</span>
+    </div>
+    <div class="nav-icon clickable" data-page="analytics" title="Analytics">
+      <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      <span class="nav-tooltip">Analytics</span>
+    </div>
+    <div class="nav-icon clickable" data-page="dashboard" title="Dashboard">
+      <svg viewBox="0 0 24 24"><rect x="2" y="2" width="9" height="11" rx="0.5"/><rect x="13" y="2" width="9" height="7" rx="0.5"/><rect x="2" y="15" width="9" height="7" rx="0.5"/><rect x="13" y="11" width="9" height="11" rx="0.5"/></svg>
+      <span class="nav-tooltip">Dashboard</span>
+    </div>
+    <div style="flex:1"></div>
+    <div class="nav-icon clickable" title="Settings">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+      <span class="nav-tooltip">Settings</span>
+    </div>
+  </nav>
+
+  <!-- MAIN -->
+  <div id="main">
+
+    <!-- TOPBAR -->
+    <div id="topbar">
+      <div class="tb-left">
+        <span class="tb-label" id="tb-section-label">Overview</span>
+        <div class="tb-sep"></div>
+        <div class="tb-nav">
+          <div class="tn on clickable" data-page="overview">Overview</div>
+          <div class="tn clickable" data-page="transactions">Transactions</div>
+          <div class="tn clickable" data-page="budgets">Budgets</div>
+          <div class="tn clickable" data-page="goals">Goals</div>
+          <div class="tn clickable" data-page="analytics">Analytics</div>
+          <div class="tn clickable" data-page="dashboard">Dashboard</div>
+        </div>
+      </div>
+      <div class="tb-right">
+        <div class="brand-name">
+          <div class="brand-letters">FIN<span class="accent">TRACK</span></div>
+          <div class="brand-tag"><span>v2.1</span>Finance OS</div>
+        </div>
+        <div class="tb-sep"></div>
+        <div class="live-ind" id="live-ind"><div class="pulse"></div>Live</div>
+        <div class="clock" id="clk">00:00:00</div>
+        <button class="topbar-action clickable" id="logout-btn" type="button">Logout</button>
+        <div class="user-chip clickable" id="user-chip" title="Current signed-in user">
+          <div class="user-dot" id="user-initial">A</div>
+          <span id="user-name">User</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONTENT -->
+    <div id="content">
+
+    <!-- â•â• PAGE: OVERVIEW â•â• -->
+    <div class="page active" id="page-overview">
+
+      <div class="hero-section reveal">
+        <div class="hero-meta">Net Worth <span class="hero-meta-sep">/</span> March 2026 <span class="hero-meta-sep">/</span> INR</div>
+        <div class="hero-numblock">
+          <div class="hero-currency">&#8377;</div>
+          <div class="hero-number"><span id="hero-int">0</span><span class="frac">.<span id="hero-dec">00</span></span></div>
+          <div class="hero-badge">
+            <div class="badge-delta">+ 8.4% THIS MONTH</div>
+            <div class="badge-label">vs &#8377;11,48,200 last month</div>
+          </div>
+        </div>
+        <div class="hero-stats-row">
+          <div class="hs-item"><div class="hs-label">Monthly Income</div><div class="hs-value up">&#8377;<span class="mc" data-t="142000">0</span></div><div class="hs-delta up">+ 12.1% vs last month</div></div>
+          <div class="hs-item"><div class="hs-label">Monthly Expenses</div><div class="hs-value dn">&#8377;<span class="mc" data-t="93500">0</span></div><div class="hs-delta dn">+ 3.2% vs last month</div></div>
+          <div class="hs-item"><div class="hs-label">Net Saved</div><div class="hs-value" style="color:var(--offwhite)">&#8377;<span class="mc" data-t="48500">0</span></div><div class="hs-delta up">34.2% savings rate</div></div>
+        </div>
+      </div>
+
+      <div class="ticker-wrap reveal">
+        <div class="ticker-track" id="ticker-track">
+          <div class="tick"><span class="tick-name">HDFC Savings</span><span class="tick-val up">&#8377;4,82,000</span><span class="tick-val up">+1.2%</span></div>
+          <div class="tick"><span class="tick-name">Investments</span><span class="tick-val up">&#8377;6,20,000</span><span class="tick-val up">+2.3%</span></div>
+          <div class="tick"><span class="tick-name">UPI Wallet</span><span class="tick-val">&#8377;43,230</span></div>
+          <div class="tick"><span class="tick-name">Food Budget</span><span class="tick-val dn">78% Used</span></div>
+          <div class="tick"><span class="tick-name">Nifty 50</span><span class="tick-val up">22,419.95</span><span class="tick-val up">+0.4%</span></div>
+          <div class="tick"><span class="tick-name">Sensex</span><span class="tick-val up">73,958.44</span><span class="tick-val up">+0.3%</span></div>
+          <div class="tick"><span class="tick-name">USD / INR</span><span class="tick-val dn">83.47</span><span class="tick-val dn">-0.1%</span></div>
+          <div class="tick"><span class="tick-name">Shopping</span><span class="tick-val dn">91% Used</span></div>
+          <div class="tick"><span class="tick-name">HDFC Savings</span><span class="tick-val up">&#8377;4,82,000</span><span class="tick-val up">+1.2%</span></div>
+          <div class="tick"><span class="tick-name">Investments</span><span class="tick-val up">&#8377;6,20,000</span><span class="tick-val up">+2.3%</span></div>
+          <div class="tick"><span class="tick-name">UPI Wallet</span><span class="tick-val">&#8377;43,230</span></div>
+          <div class="tick"><span class="tick-name">Food Budget</span><span class="tick-val dn">78% Used</span></div>
+          <div class="tick"><span class="tick-name">Nifty 50</span><span class="tick-val up">22,419.95</span><span class="tick-val up">+0.4%</span></div>
+          <div class="tick"><span class="tick-name">Sensex</span><span class="tick-val up">73,958.44</span><span class="tick-val up">+0.3%</span></div>
+          <div class="tick"><span class="tick-name">USD / INR</span><span class="tick-val dn">83.47</span><span class="tick-val dn">-0.1%</span></div>
+          <div class="tick"><span class="tick-name">Shopping</span><span class="tick-val dn">91% Used</span></div>
+        </div>
+      </div>
+
+      <div class="grid-2 reveal">
+        <div class="panel">
+          <div class="panel-eyebrow">12-Month Performance</div>
+          <div class="chart-legend">
+            <div class="leg"><div class="leg-line" style="background:var(--acid)"></div>Income</div>
+            <div class="leg"><div class="leg-line" style="background:var(--ember)"></div>Expenses</div>
+            <div class="leg"><div class="leg-line" style="background:var(--offwhite);opacity:0.3;border-top:1px dashed var(--offwhite)"></div>Net</div>
+          </div>
+          <div class="chart-container"><svg id="chartSvg"></svg></div>
+        </div>
+        <div class="panel">
+          <div class="panel-eyebrow">Account Breakdown</div>
+          <div class="panel-title" style="margin-bottom:12px;">Net Worth</div>
+          <div class="donut-wrap">
+            <div style="position:relative;width:130px;height:130px;flex-shrink:0">
+              <svg width="130" height="130" viewBox="0 0 130 130" id="donut"></svg>
+              <div class="donut-center-text"><div class="donut-big" id="overview-donut-total">&#8377;12.4L</div><div class="donut-sub">Total</div></div>
+            </div>
+            <div class="donut-legend" id="donut-legend">
+              <div class="dl-item"><div class="dl-left"><div class="dl-dot" style="background:var(--acid)"></div>HDFC Savings</div><div class="dl-val" style="color:var(--acid)">&#8377;4.82L</div></div>
+              <div class="dl-item"><div class="dl-left"><div class="dl-dot" style="background:var(--ice)"></div>Investments</div><div class="dl-val" style="color:var(--ice)">&#8377;6.20L</div></div>
+              <div class="dl-item"><div class="dl-left"><div class="dl-dot" style="background:var(--ember)"></div>UPI Wallet</div><div class="dl-val" style="color:var(--ember)">&#8377;0.43L</div></div>
+            </div>
+          </div>
+          <div style="margin-top:24px;border-top:1px solid var(--line);padding-top:20px;" id="accounts-list">
+            <div class="account-row"><div class="acc-left"><div class="acc-dot" style="background:var(--acid);box-shadow:0 0 6px var(--acid)"></div><div><div class="acc-name">HDFC Savings</div><div class="acc-type">Savings Account</div></div></div><div class="acc-val" style="color:var(--acid)">&#8377;4,82,000</div></div>
+            <div class="account-row"><div class="acc-left"><div class="acc-dot" style="background:var(--ice);box-shadow:0 0 6px var(--ice)"></div><div><div class="acc-name">Zerodha</div><div class="acc-type">Investment Account</div></div></div><div class="acc-val" style="color:var(--ice)">&#8377;6,20,000</div></div>
+            <div class="account-row"><div class="acc-left"><div class="acc-dot" style="background:var(--ember);box-shadow:0 0 6px var(--ember)"></div><div><div class="acc-name">Paytm Wallet</div><div class="acc-type">UPI Wallet</div></div></div><div class="acc-val" style="color:var(--ember)">&#8377;43,230</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid-2-equal reveal" style="border-bottom:1px solid var(--line)">
+        <div class="panel">
+          <div class="panel-eyebrow">Real-Time Feed</div>
+          <div class="panel-title">Recent Transactions</div>
+          <div class="tx-header"><span>Description</span><span>Date</span><span style="text-align:right">Amount</span></div>
+          <div id="overview-tx-list">
+            <div class="tx-row clickable"><div><div class="tx-name">Swiggy</div><div class="tx-cat">Food &amp; Dining</div></div><div class="tx-date">Today</div><div class="tx-amount dn">-&#8377;480</div></div>
+            <div class="tx-row clickable"><div><div class="tx-name">Salary Credit</div><div class="tx-cat">Income · HDFC</div></div><div class="tx-date">Mar 01</div><div class="tx-amount up">+&#8377;1,20,000</div></div>
+            <div class="tx-row clickable"><div><div class="tx-name">Netflix</div><div class="tx-cat">Subscriptions</div></div><div class="tx-date">Mar 05</div><div class="tx-amount dn">-&#8377;649</div></div>
+            <div class="tx-row clickable"><div><div class="tx-name">IndiGo Airlines</div><div class="tx-cat">Travel</div></div><div class="tx-date">Mar 08</div><div class="tx-amount dn">-&#8377;8,200</div></div>
+            <div class="tx-row clickable"><div><div class="tx-name">Zerodha Dividend</div><div class="tx-cat">Investments</div></div><div class="tx-date">Mar 10</div><div class="tx-amount up">+&#8377;3,200</div></div>
+          </div>
+        </div>
+        <div class="panel" style="border-right:none">
+          <div class="panel-eyebrow">Budget Matrix</div>
+          <div class="panel-title">Monthly Limits</div>
+          <div id="overview-budget-list">
+            <div class="bud-row"><div class="bud-meta"><span class="bud-name">Food &amp; Dining</span><span class="bud-nums">&#8377;7,800 / &#8377;10,000</span></div><div class="bud-track"><div class="bud-fill" data-w="78" style="background:var(--ember)"></div></div><div class="bud-status dn">78% used - &#8377;2,200 remaining</div></div>
+            <div class="bud-row"><div class="bud-meta"><span class="bud-name">Shopping</span><span class="bud-nums">&#8377;9,100 / &#8377;10,000</span></div><div class="bud-track"><div class="bud-fill" data-w="91" style="background:var(--ember)"></div></div><div class="bud-status dn">91% used - &#8377;900 remaining</div></div>
+            <div class="bud-row"><div class="bud-meta"><span class="bud-name">Transport</span><span class="bud-nums">&#8377;2,100 / &#8377;5,000</span></div><div class="bud-track"><div class="bud-fill" data-w="42" style="background:var(--acid)"></div></div><div class="bud-status" style="color:var(--muted)">42% used - &#8377;2,900 remaining</div></div>
+            <div class="bud-row"><div class="bud-meta"><span class="bud-name">Entertainment</span><span class="bud-nums">â‚¹1,450 / â‚¹5,000</span></div><div class="bud-track"><div class="bud-fill" data-w="29" style="background:var(--ice)"></div></div><div class="bud-status up">29% used â€” On track</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid-2-equal reveal" style="border-bottom:1px solid var(--line)">
+        <div class="panel">
+          <div class="panel-eyebrow">Goal Tracker</div>
+          <div class="panel-title">Savings Goals</div>
+          <div id="overview-goals-list">
+            <div class="goal-row clickable"><div class="goal-index">01</div><div class="goal-body"><div class="goal-name">Emergency Fund</div><div class="goal-bar-track"><div class="goal-bar-fill" data-w="62" style="background:var(--acid)"></div></div></div><div class="goal-right"><div class="goal-pct up">62%</div><div class="goal-eta">~3 months left</div></div></div>
+            <div class="goal-row clickable"><div class="goal-index">02</div><div class="goal-body"><div class="goal-name">Goa Vacation</div><div class="goal-bar-track"><div class="goal-bar-fill" data-w="38" style="background:var(--ember)"></div></div></div><div class="goal-right"><div class="goal-pct" style="color:var(--ember)">38%</div><div class="goal-eta">~5 months left</div></div></div>
+            <div class="goal-row clickable"><div class="goal-index">03</div><div class="goal-body"><div class="goal-name">MacBook Pro</div><div class="goal-bar-track"><div class="goal-bar-fill" data-w="15" style="background:var(--ice)"></div></div></div><div class="goal-right"><div class="goal-pct" style="color:var(--ice)">15%</div><div class="goal-eta">~14 months left</div></div></div>
+          </div>
+        </div>
+        <div class="panel" style="border-right:none">
+          <div class="panel-eyebrow">AI Analysis</div>
+          <div class="panel-title">Financial Insights</div>
+          <div id="overview-insights-list">
+            <div class="insight-row clickable"><div class="insight-tag up">WIN</div><div class="insight-text"><strong>Emergency fund</strong> on pace - completing in approximately 3 months at current contribution rate.</div></div>
+            <div class="insight-row clickable"><div class="insight-tag dn">FLAG</div><div class="insight-text"><strong>Shopping budget</strong> at 91% with 16 days remaining. Reduce spend by &#8377;900 to avoid overage.</div></div>
+            <div class="insight-row clickable"><div class="insight-tag up">HIGH</div><div class="insight-text"><strong>Savings rate 34.2%</strong> - highest in 6 months. Income growth outpacing expense growth by 8.9pp.</div></div>
+            <div class="insight-row clickable"><div class="insight-tag" style="color:var(--ice)">INFO</div><div class="insight-text"><strong>Zerodha portfolio</strong> up &#8377;14,230 this month. Dividend of &#8377;3,200 credited on Mar 10.</div></div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /page:overview -->
+
+    <!-- â•â• PAGE: TRANSACTIONS â•â• -->
+    <div class="page" id="page-transactions">
+      <div class="page-hero">
+        <div><div class="page-eyebrow">Real-Time Feed</div><div class="page-title">Transactions</div></div>
+        <div class="page-hero-right">
+          <div class="filter-row">
+            <select id="tx-filter-type" class="ft-select"><option value="">All Types</option><option value="CREDIT">Income</option><option value="DEBIT">Expense</option></select>
+            <select id="tx-filter-cat" class="ft-select"><option value="">All Categories</option></select>
+            <div><input id="tx-search" class="ft-input" type="text" placeholder="Search transactions..."/></div>
+          </div>
+        </div>
+      </div>
+      <div class="grid-2-std" style="margin-top:24px">
+        <div class="panel-card">
+          <div class="panel-eyebrow">Account Setup</div>
+          <div class="panel-title">Add Bank Account</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <input id="account-name" class="ft-input" type="text" placeholder="Account name" style="width:100%">
+            <select id="account-type" class="ft-select">
+              <option value="CHECKING">Checking</option>
+              <option value="SAVINGS">Savings</option>
+              <option value="CREDIT_CARD">Credit Card</option>
+              <option value="WALLET">Wallet</option>
+              <option value="INVESTMENT">Investment</option>
+              <option value="CASH">Cash</option>
+            </select>
+            <input id="account-balance" class="ft-input" type="number" placeholder="Initial balance" style="width:100%">
+            <input id="account-institution" class="ft-input" type="text" placeholder="Institution" style="width:100%">
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-top:16px;gap:12px">
+            <div style="font-family:var(--font-mono);font-size:9px;color:var(--muted);letter-spacing:0.08em;text-transform:uppercase">Create an account before uploading statements</div>
+            <button id="create-account-btn" class="pg-btn" type="button">CREATE ACCOUNT</button>
+          </div>
+          <div id="account-list" style="margin-top:20px;display:flex;flex-direction:column;gap:10px"></div>
+        </div>
+        <div class="panel-card">
+          <div class="panel-eyebrow">Statement Upload</div>
+          <div class="panel-title">Upload PDF</div>
+          <div style="margin-bottom:16px">
+            <label style="font-family:var(--font-mono);font-size:9px;letter-spacing:0.2em;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:8px">Select Account</label>
+            <select id="upload-account-select" class="ft-select" style="width:100%;max-width:none">
+              <option value="">-- Choose Account --</option>
+            </select>
+          </div>
+          <div style="margin-bottom:12px;padding:16px;background:rgba(0,229,255,0.04);border:1px solid rgba(0,229,255,0.1);font-family:var(--font-mono);font-size:9px;color:var(--ice)">Upload a PDF bank or card statement. On success the dashboard and transactions refresh with live backend data.</div>
+          <div id="pdf-drop-zone" style="text-align:center;cursor:pointer;padding:26px 20px;border:2px dashed var(--line)">
+            <div style="margin-bottom:8px;font-size:16px">PDF</div>
+            <div style="margin-bottom:4px;font-weight:600;font-family:var(--font-display)">Drag and drop a PDF or click to upload</div>
+            <div style="font-size:8px;color:var(--dim);font-family:var(--font-mono)">Bank statements • Max 50MB</div>
+          </div>
+        </div>
+      </div>
+      <div class="full-panel">
+        <div class="tx-full-header"><span>#</span><span>Description</span><span>Category</span><span>HMM State</span><span>Date</span><span style="text-align:right">Amount</span></div>
+        <div id="tx-full-list"><div class="page-loading">Fetching transactions<span class="blink">_</span></div></div>
+        <div class="pagination-row">
+          <button class="pg-btn" id="tx-prev" disabled>PREV</button>
+          <span class="pg-info" id="tx-page-info">-- / --</span>
+          <button class="pg-btn" id="tx-next">NEXT</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- â•â• PAGE: BUDGETS â•â• -->
+    <div class="page" id="page-budgets">
+      <div class="page-hero">
+        <div><div class="page-eyebrow">Budget Matrix</div><div class="page-title">Monthly Limits</div></div>
+        <div class="page-hero-right"><div class="month-label" id="bud-period">MAR 2026</div></div>
+      </div>
+      <div id="bud-summary-row" class="stat-strip"></div>
+      <div id="bud-full-list" class="full-panel bud-grid"><div class="page-loading">Loading budgets<span class="blink">_</span></div></div>
+    </div>
+
+    <!-- â•â• PAGE: GOALS â•â• -->
+    <div class="page" id="page-goals">
+      <div class="page-hero">
+        <div><div class="page-eyebrow">Goal Tracker</div><div class="page-title">Savings Goals</div></div>
+        <div class="page-hero-right"><div class="stat-chip" id="goals-total-chip">Total Saved: &#8377;0</div></div>
+      </div>
+      <div id="goals-full-list" class="full-panel goals-grid"><div class="page-loading">Loading goals<span class="blink">_</span></div></div>
+    </div>
+
+    <!-- â•â• PAGE: ANALYTICS â•â• -->
+    <div class="page" id="page-analytics">
+      <div class="page-hero">
+        <div><div class="page-eyebrow">Performance Analysis</div><div class="page-title">Analytics</div></div>
+      </div>
+      <div>
+        <div id="analytics-kpis" class="full-panel stat-strip-lg"></div>
+        <div style="display:flex;gap:0;margin-top:24px;">
+          <div class="full-panel" style="flex:2;margin-top:0">
+            <div class="panel-eyebrow">Income vs Expenses - 12 Months</div>
+            <div class="chart-container" style="height:260px"><svg id="analyticsChartSvg" style="width:100%;height:100%;overflow:visible"></svg></div>
+          </div>
+          <div class="full-panel" style="flex:1;margin-top:0;border-left:none">
+            <div class="panel-eyebrow">Spending by Category</div>
+            <div style="display:flex;flex-direction:column;align-items:center;padding-top:12px">
+              <div style="position:relative;width:160px;height:160px">
+                <svg width="160" height="160" viewBox="0 0 160 160" id="analyticsDonut"></svg>
+                <div class="donut-center-text"><div class="donut-big" id="analytics-donut-center">--</div><div class="donut-sub">Expenses</div></div>
+              </div>
+              <div id="analytics-cat-legend" style="width:100%;margin-top:20px;display:flex;flex-direction:column;gap:8px"></div>
+            </div>
+          </div>
+        </div>
+        <div class="full-panel">
+          <div class="panel-eyebrow">Recurring Transactions</div>
+          <div class="panel-title" style="margin-bottom:20px">Fixed Commitments</div>
+          <div id="recurring-list"><div class="page-loading">Loading<span class="blink">_</span></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- â•â• PAGE: DASHBOARD (from dashboard.html â€” integrated) â•â• -->
+    <div class="page" id="page-dashboard">
+      <div class="page-hero reveal">
+        <div>
+          <div class="page-eyebrow">Advanced Analytics</div>
+          <div class="page-title">Dashboard</div>
+        </div>
+      </div>
+
+      <!-- KPI STRIP -->
+      <div class="grid-5-std reveal" style="margin-top:24px">
+        <div class="stat-card">
+          <div class="stat-label">Total Income</div>
+          <div class="stat-value" style="color:var(--acid)" id="dash-totalIncome">&#8377;1,42,000</div>
+          <div class="stat-delta up">Up monthly income</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Total Expenses</div>
+          <div class="stat-value" style="color:var(--ember)" id="dash-totalExpenses">&#8377;93,500</div>
+          <div class="stat-delta dn">Up monthly spend</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Net Savings</div>
+          <div class="stat-value" id="dash-netSavings">&#8377;48,500</div>
+          <div class="stat-delta up">Available to save</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Savings Rate</div>
+          <div class="stat-value up" id="dash-savingsRate">34.2%</div>
+          <div class="stat-delta" style="color:var(--muted)">Of income saved</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Account Balance</div>
+          <div class="stat-value" style="color:var(--offwhite)" id="dash-totalBalance">&#8377;12,45,230</div>
+          <div class="stat-delta" style="color:var(--muted)">Current balance</div>
+        </div>
+      </div>
+
+      <!-- CHARTS ROW -->
+      <div class="grid-2-std reveal" style="margin-top:24px">
+        <div class="panel-card">
+          <div class="panel-eyebrow">Category Distribution</div>
+          <div class="chart-legend"><div class="leg"><div class="leg-line" style="background:var(--acid)"></div>Category</div></div>
+          <div class="chart-container-lg"><canvas id="dash-categoryChart"></canvas></div>
+        </div>
+        <div class="panel-card">
+          <div class="panel-eyebrow">Category Trends</div>
+          <div class="chart-legend"><div class="leg"><div class="leg-line" style="background:var(--ice)"></div>Spending</div></div>
+          <div class="chart-container-lg"><canvas id="dash-trendChart"></canvas></div>
+        </div>
+      </div>
+
+      <!-- INSIGHTS ROW -->
+      <div class="grid-4-std reveal" style="margin-top:24px">
+        <div class="panel-card">
+          <div class="stat-label">Top Category</div>
+          <div class="stat-value" style="margin-bottom:8px" id="dash-topCategory">Food</div>
+          <div class="stat-delta up" id="dash-topCategoryPercent">32.1% of spending</div>
+        </div>
+        <div class="panel-card">
+          <div class="stat-label">Top Merchant</div>
+          <div class="stat-value" style="margin-bottom:8px" id="dash-topMerchant">Swiggy</div>
+          <div class="stat-delta" style="color:var(--muted)" id="dash-topMerchantCount">8 transactions</div>
+        </div>
+        <div class="panel-card">
+          <div class="stat-label">Unusual Spend</div>
+          <div class="stat-value" style="margin-bottom:8px;color:var(--ember)" id="dash-unusualAmount">&#8377;8,200</div>
+          <div class="stat-delta" style="color:var(--muted)">Highest transaction</div>
+        </div>
+        <div class="panel-card">
+          <div class="stat-label">Recurring</div>
+          <div class="stat-value" style="margin-bottom:8px" id="dash-recurringCount">3</div>
+          <div class="stat-delta" style="color:var(--muted)">Subscriptions detected</div>
+        </div>
+      </div>
+
+      <!-- HMM ANALYSIS -->
+      <div class="grid-2-std reveal" style="margin-top:24px">
+        <div class="panel-card">
+          <div class="panel-eyebrow">Spending State Timeline</div>
+          <div class="chart-container-lg"><canvas id="dash-hmmChart"></canvas></div>
+        </div>
+        <div class="panel-card">
+          <div class="panel-eyebrow">Spending States</div>
+          <div style="margin-top:20px">
+            <div class="alert-box alert-success">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+                <span style="font-weight:700;font-family:var(--font-display);letter-spacing:0.05em">LOW SPENDING</span>
+                <span id="dash-stateLow" style="font-family:var(--font-display);font-size:28px;font-weight:900;color:var(--acid)">12</span>
+              </div>
+              <div style="font-family:var(--font-mono);font-size:8px;color:var(--muted);text-transform:uppercase" id="dash-stateLowPct">40% of days</div>
+            </div>
+            <div class="alert-box alert-info">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+                <span style="font-weight:700;font-family:var(--font-display);letter-spacing:0.05em">NORMAL SPENDING</span>
+                <span id="dash-stateNormal" style="font-family:var(--font-display);font-size:28px;font-weight:900;color:var(--ice)">14</span>
+              </div>
+              <div style="font-family:var(--font-mono);font-size:8px;color:var(--muted);text-transform:uppercase" id="dash-stateNormalPct">47% of days</div>
+            </div>
+            <div class="alert-box alert-warning">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+                <span style="font-weight:700;font-family:var(--font-display);letter-spacing:0.05em">HIGH SPENDING</span>
+                <span id="dash-stateHigh" style="font-family:var(--font-display);font-size:28px;font-weight:900;color:var(--ember)">4</span>
+              </div>
+              <div style="font-family:var(--font-mono);font-size:8px;color:var(--muted);text-transform:uppercase" id="dash-stateHighPct">13% of days</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ANOMALIES -->
+      <div class="reveal" style="margin-top:24px">
+        <div class="panel-card">
+          <div class="panel-eyebrow">Anomalies Detected</div>
+          <div id="dash-anomalies">
+            <div class="alert-box"><span style="color:var(--muted);font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:0.12em">No anomalies detected</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TRANSACTION TABLE -->
+      <div class="reveal" style="margin-top:24px">
+        <div class="panel-card">
+          <div class="panel-eyebrow">Transaction History</div>
+          <div style="display:flex;gap:10px;margin-bottom:24px;flex-wrap:wrap">
+            <input type="text" id="dash-search" class="ft-input" placeholder="Search merchant..." style="flex:1;min-width:200px">
+            <select id="dash-catFilter" class="ft-select"><option value="">All Categories</option></select>
+            <select id="dash-typeFilter" class="ft-select"><option value="">All Types</option><option value="INCOME">Credit</option><option value="EXPENSE">Debit</option></select>
+            <select id="dash-stateFilter" class="ft-select"><option value="">All States</option><option value="low">Low</option><option value="normal">Normal</option><option value="high">High</option></select>
+          </div>
+          <div style="overflow-x:auto">
+            <table style="width:100%;border-collapse:collapse">
+              <thead>
+                <tr style="border-bottom:1px solid var(--line)">
+                  <th style="font-family:var(--font-mono);font-size:8px;letter-spacing:0.2em;color:var(--muted);text-transform:uppercase;padding:12px 0;text-align:left;width:12%">Date</th>
+                  <th style="font-family:var(--font-mono);font-size:8px;letter-spacing:0.2em;color:var(--muted);text-transform:uppercase;padding:12px 0;text-align:left;width:28%">Merchant</th>
+                  <th style="font-family:var(--font-mono);font-size:8px;letter-spacing:0.2em;color:var(--muted);text-transform:uppercase;padding:12px 0;text-align:left;width:12%">Type</th>
+                  <th style="font-family:var(--font-mono);font-size:8px;letter-spacing:0.2em;color:var(--muted);text-transform:uppercase;padding:12px 0;text-align:left;width:18%">Amount</th>
+                  <th style="font-family:var(--font-mono);font-size:8px;letter-spacing:0.2em;color:var(--muted);text-transform:uppercase;padding:12px 0;text-align:left;width:18%">Category</th>
+                  <th style="font-family:var(--font-mono);font-size:8px;letter-spacing:0.2em;color:var(--muted);text-transform:uppercase;padding:12px 0;text-align:left;width:12%">State</th>
+                </tr>
+              </thead>
+              <tbody id="dash-txTable">
+                <tr><td colspan="6" style="text-align:center;color:var(--muted);padding:32px 0;font-family:var(--font-mono);font-size:10px;letter-spacing:0.15em;text-transform:uppercase">Loading transactions<span class="blink">_</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div style="display:flex;justify-content:flex-end;margin-top:20px;padding-top:16px;border-top:1px solid var(--line2);gap:8px" id="dash-pagination"></div>
+        </div>
+      </div>
+    </div><!-- /page:dashboard -->
+
+    </div><!-- /content -->
+  </div><!-- /main -->
+</div><!-- /shell -->
+
+<script src="app.js"></script>
+</body>
+</html>
