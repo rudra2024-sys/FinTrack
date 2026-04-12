@@ -14,49 +14,77 @@ public class RuleBasedCategorizer {
     private static final Map<String, String> INCOME_RULES = new LinkedHashMap<>();
 
     static {
-        EXPENSE_RULES.put("zomato", "Food & Dining");
-        EXPENSE_RULES.put("swiggy", "Food & Dining");
-        EXPENSE_RULES.put("restaurant", "Food & Dining");
-        EXPENSE_RULES.put("cafe", "Food & Dining");
+        EXPENSE_RULES.put("zomato", "Food");
+        EXPENSE_RULES.put("swiggy", "Food");
+        EXPENSE_RULES.put("restaurant", "Food");
+        EXPENSE_RULES.put("snacks", "Food");
+        EXPENSE_RULES.put("food", "Food");
+        EXPENSE_RULES.put("coffee", "Food");
+        EXPENSE_RULES.put("grocery", "Food");
+
         EXPENSE_RULES.put("uber", "Transport");
         EXPENSE_RULES.put("ola", "Transport");
-        EXPENSE_RULES.put("metro", "Transport");
-        EXPENSE_RULES.put("petrol", "Transport");
-        EXPENSE_RULES.put("rent", "Rent");
-        EXPENSE_RULES.put("landlord", "Rent");
+        EXPENSE_RULES.put("taxi", "Transport");
+        EXPENSE_RULES.put("cab", "Transport");
+
+        EXPENSE_RULES.put("electricity", "Bills");
+        EXPENSE_RULES.put("recharge", "Bills");
+        EXPENSE_RULES.put("internet", "Bills");
+        EXPENSE_RULES.put("rent", "Bills");
+        EXPENSE_RULES.put("insurance", "Bills");
+        EXPENSE_RULES.put("bill", "Bills");
+
         EXPENSE_RULES.put("amazon", "Shopping");
         EXPENSE_RULES.put("flipkart", "Shopping");
-        EXPENSE_RULES.put("mall", "Shopping");
-        EXPENSE_RULES.put("electricity", "Utilities");
-        EXPENSE_RULES.put("water bill", "Utilities");
-        EXPENSE_RULES.put("internet", "Utilities");
-        EXPENSE_RULES.put("netflix", "Subscriptions");
-        EXPENSE_RULES.put("spotify", "Subscriptions");
-        EXPENSE_RULES.put("hospital", "Healthcare");
-        EXPENSE_RULES.put("pharmacy", "Healthcare");
+        EXPENSE_RULES.put("electronics", "Shopping");
+        EXPENSE_RULES.put("shopping", "Shopping");
+
+        EXPENSE_RULES.put("pharmacy", "Health");
+        EXPENSE_RULES.put("hospital", "Health");
+        EXPENSE_RULES.put("medical", "Health");
+
+        EXPENSE_RULES.put("netflix", "Entertainment");
         EXPENSE_RULES.put("movie", "Entertainment");
-        EXPENSE_RULES.put("travel", "Travel");
-        EXPENSE_RULES.put("airlines", "Travel");
+        EXPENSE_RULES.put("gaming", "Entertainment");
+        EXPENSE_RULES.put("ott", "Entertainment");
+
+        EXPENSE_RULES.put("salon", "Personal");
+        EXPENSE_RULES.put("gym", "Personal");
 
         INCOME_RULES.put("salary", "Salary");
         INCOME_RULES.put("payroll", "Salary");
-        INCOME_RULES.put("bonus", "Salary");
         INCOME_RULES.put("freelance", "Freelance");
-        INCOME_RULES.put("consulting", "Freelance");
-        INCOME_RULES.put("dividend", "Investments");
-        INCOME_RULES.put("interest", "Investments");
-        INCOME_RULES.put("refund", "Other Income");
+        INCOME_RULES.put("bonus", "Bonus");
+        INCOME_RULES.put("refund", "Refund");
+        INCOME_RULES.put("cashback", "Refund");
     }
 
     public String categorize(String description, TransactionType type) {
-        String normalized = description == null ? "" : description.toLowerCase(Locale.ENGLISH);
+        return categorize(description, null, null, type);
+    }
+
+    public String categorize(String description, String merchant, String notes, TransactionType type) {
+        String normalized = normalize(description, merchant, notes);
         Map<String, String> rules = type == TransactionType.EXPENSE ? EXPENSE_RULES : INCOME_RULES;
         for (Map.Entry<String, String> entry : rules.entrySet()) {
             if (normalized.contains(entry.getKey())) {
                 return entry.getValue();
             }
         }
-        return type == TransactionType.EXPENSE ? "Other" : "Other Income";
+        return type == TransactionType.EXPENSE ? "Others" : "Others";
+    }
+
+    private String normalize(String... values) {
+        StringBuilder builder = new StringBuilder();
+        for (String value : values) {
+            if (value == null || value.isBlank()) {
+                continue;
+            }
+            if (builder.length() > 0) {
+                builder.append(' ');
+            }
+            builder.append(value.trim().toLowerCase(Locale.ENGLISH));
+        }
+        return builder.toString();
     }
 }
-

@@ -12,16 +12,20 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 @Service
 @RequiredArgsConstructor
 public class TransactionService {
 
+    private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm");
+
     private final TransactionRepository transactionRepository;
     private final AccountRepository accountRepository;
     private final CategoryRepository categoryRepository;
     private final UserRepository userRepository;
+    private final TransactionClassificationService transactionClassificationService;
 
     @Transactional
     public Response create(Long userId, CreateRequest req) {
@@ -35,11 +39,13 @@ public class TransactionService {
                 .account(account)
                 .category(category)
                 .type(req.type())
-                .amount(req.amount())
+                .amount(req.amount().abs())
                 .description(req.description())
                 .merchant(req.merchant())
                 .notes(req.notes())
                 .transactionDate(req.transactionDate())
+                .transactionTime(req.transactionTime())
+                .spendingState(resolveSpendingState(req.amount()))
                 .tags(req.tags())
                 .build();
 
@@ -92,12 +98,14 @@ public class TransactionService {
         if (req.accountId() != null) tx.setAccount(getAccount(req.accountId(), userId));
         if (req.categoryId() != null) tx.setCategory(categoryRepository.findById(req.categoryId()).orElse(null));
         if (req.type() != null) tx.setType(req.type());
-        if (req.amount() != null) tx.setAmount(req.amount());
+        if (req.amount() != null) tx.setAmount(req.amount().abs());
         if (req.description() != null) tx.setDescription(req.description());
         if (req.merchant() != null) tx.setMerchant(req.merchant());
         if (req.notes() != null) tx.setNotes(req.notes());
         if (req.transactionDate() != null) tx.setTransactionDate(req.transactionDate());
+        if (req.transactionTime() != null) tx.setTransactionTime(req.transactionTime());
         if (req.tags() != null) tx.setTags(req.tags());
+        tx.setSpendingState(resolveSpendingState(tx.getAmount()));
 
         // Apply new balance effect
         updateAccountBalance(tx.getAccount(), tx.getType(), tx.getAmount());
@@ -148,23 +156,35 @@ public class TransactionService {
     }
 
     public Response toResponse(Transaction tx) {
+        Transaction.SpendingState spendingState = transactionClassificationService.classifySpendingState(tx.getAmount());
+        String categoryName = transactionClassificationService.resolveCategoryName(tx);
+        String categoryColor = transactionClassificationService.resolveCategoryColor(tx);
+        String categoryIcon = transactionClassificationService.resolveCategoryIcon(tx);
         return new Response(
                 tx.getId(),
                 tx.getAccount().getId(),
                 tx.getAccount().getName(),
                 tx.getCategory() != null ? tx.getCategory().getId() : null,
-                tx.getCategory() != null ? tx.getCategory().getName() : null,
-                tx.getCategory() != null ? tx.getCategory().getColor() : null,
-                tx.getCategory() != null ? tx.getCategory().getIcon() : null,
+                categoryName,
+                categoryColor,
+                categoryIcon,
                 tx.getType(),
                 tx.getAmount(),
                 tx.getDescription(),
                 tx.getMerchant(),
                 tx.getNotes(),
                 tx.getTransactionDate(),
+                tx.getTransactionTime() != null ? tx.getTransactionTime().format(TIME_FORMATTER) : null,
+                tx.getMerchant() != null ? tx.getMerchant() : tx.getDescription(),
+                spendingState,
+                spendingState,
                 tx.getIsRecurring(),
                 tx.getTags(),
                 tx.getCreatedAt() != null ? tx.getCreatedAt().toString() : null
         );
+    }
+
+    private Transaction.SpendingState resolveSpendingState(BigDecimal amount) {
+        return transactionClassificationService.classifySpendingStateWithLog(amount);
     }
 }

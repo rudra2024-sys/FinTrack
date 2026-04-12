@@ -9,6 +9,7 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalTime;
 
 @Entity
 @Table(name = "transactions")
@@ -50,6 +51,13 @@ public class Transaction {
     @Column(name = "transaction_date", nullable = false)
     private LocalDate transactionDate;
 
+    @Column(name = "transaction_time")
+    private LocalTime transactionTime;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "spending_state")
+    private SpendingState spendingState;
+
     @Column(name = "is_recurring", nullable = false)
     @Builder.Default
     private Boolean isRecurring = false;
@@ -76,7 +84,33 @@ public class Transaction {
     @Column(name = "updated_at")
     private Instant updatedAt;
 
+    @PrePersist
+    @PreUpdate
+    void applyDerivedFields() {
+        if (amount != null) {
+            amount = amount.abs();
+            spendingState = SpendingState.fromAmount(amount);
+        }
+    }
+
     public enum TransactionType {
         INCOME, EXPENSE, TRANSFER
+    }
+
+    public enum SpendingState {
+        LOW, NORMAL, HIGH;
+
+        public static SpendingState fromAmount(BigDecimal amount) {
+            if (amount == null) {
+                return NORMAL;
+            }
+            if (amount.compareTo(BigDecimal.valueOf(500)) < 0) {
+                return LOW;
+            }
+            if (amount.compareTo(BigDecimal.valueOf(2000)) > 0) {
+                return HIGH;
+            }
+            return NORMAL;
+        }
     }
 }

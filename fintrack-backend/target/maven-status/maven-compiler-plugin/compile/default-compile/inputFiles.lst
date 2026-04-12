@@ -51,6 +51,7 @@ C:\Fintrack\fintrack-backend\src\main\java\com\fintrack\controller\SavingsGoalCo
 C:\Fintrack\fintrack-backend\src\main\java\com\fintrack\intelligence\FinancialIntelligenceService.java
 C:\Fintrack\fintrack-backend\src\main\java\com\fintrack\repository\RefreshTokenRepository.java
 C:\Fintrack\fintrack-backend\src\main\java\com\fintrack\controller\AnalyticsController.java
+C:\Fintrack\fintrack-backend\src\main\java\com\fintrack\controller\SystemController.java
 C:\Fintrack\fintrack-backend\src\main\java\com\fintrack\ai\AiMlGateway.java
 C:\Fintrack\fintrack-backend\src\main\java\com\fintrack\repository\UserRepository.java
 C:\Fintrack\fintrack-backend\src\main\java\com\fintrack\service\RecurringTransactionService.java
@@ -60,10 +61,13 @@ C:\Fintrack\fintrack-backend\src\main\java\com\fintrack\repository\RecurringTran
 C:\Fintrack\fintrack-backend\src\main\java\com\fintrack\repository\SavingsGoalRepository.java
 C:\Fintrack\fintrack-backend\src\main\java\com\fintrack\service\AnalyticsService.java
 C:\Fintrack\fintrack-backend\src\main\java\com\fintrack\dto\transaction\TransactionDTOs.java
+C:\Fintrack\fintrack-backend\src\main\java\com\fintrack\controller\UserProfileController.java
 C:\Fintrack\fintrack-backend\src\main\java\com\fintrack\parser\ParsedStatementRow.java
+C:\Fintrack\fintrack-backend\src\main\java\com\fintrack\service\TransactionClassificationService.java
 C:\Fintrack\fintrack-backend\src\main\java\com\fintrack\dto\budget\BudgetDTOs.java
 C:\Fintrack\fintrack-backend\src\main\java\com\fintrack\repository\BudgetRepository.java
 C:\Fintrack\fintrack-backend\src\main\java\com\fintrack\parser\PdfStatementParser.java
+C:\Fintrack\fintrack-backend\src\main\java\com\fintrack\config\DemoDataConfig.java
 C:\Fintrack\fintrack-backend\src\main\java\com\fintrack\entity\RefreshToken.java
 C:\Fintrack\fintrack-backend\src\main\java\com\fintrack\goals\FinancialGoalController.java
 C:\Fintrack\fintrack-backend\src\main\java\com\fintrack\controller\TransactionController.java

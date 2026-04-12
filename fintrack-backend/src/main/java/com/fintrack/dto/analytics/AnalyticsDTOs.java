@@ -10,10 +10,14 @@ public class AnalyticsDTOs {
             BigDecimal totalExpenses,
             BigDecimal netSavings,
             BigDecimal savingsRate,
+            Long transactionCount,
+            BigDecimal highestExpense,
             BigDecimal totalBalance,
             List<AccountBalance> accountBalances,
             List<MonthlyData> monthlyTrend,
             List<CategorySpend> topCategories,
+            List<CategorySpend> categoryDistribution,
+            SpendingStateSummary spendingStates,
             List<BudgetAlert> budgetAlerts
     ) {}
 
@@ -38,6 +42,12 @@ public class AnalyticsDTOs {
             String color,
             BigDecimal amount,
             Double percentage
+    ) {}
+
+    public record SpendingStateSummary(
+            long low,
+            long normal,
+            long high
     ) {}
 
     public record BudgetAlert(

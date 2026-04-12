@@ -1,6 +1,7 @@
 package com.fintrack.service;
 
 import com.fintrack.dto.analytics.AnalyticsDTOs.*;
+import com.fintrack.entity.Transaction;
 import com.fintrack.dto.budget.BudgetDTOs;
 import com.fintrack.entity.Transaction.TransactionType;
 import com.fintrack.repository.*;
@@ -12,7 +13,12 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -21,6 +27,7 @@ public class AnalyticsService {
     private final TransactionRepository transactionRepository;
     private final AccountRepository accountRepository;
     private final BudgetService budgetService;
+    private final TransactionClassificationService transactionClassificationService;
 
     @Transactional(readOnly = true)
     public DashboardSummary getDashboard(Long userId) {
@@ -71,12 +78,22 @@ public class AnalyticsService {
 
         // Top spending categories this month
         List<CategorySpend> topCategories = getCategoryBreakdown(userId, monthStart, monthEnd);
+        List<Transaction> monthlyTransactions = transactionRepository
+                .findByUserIdAndTransactionDateBetweenOrderByTransactionDateAscCreatedAtAsc(userId, monthStart, monthEnd);
+        long transactionCount = monthlyTransactions.size();
+        BigDecimal highestExpense = monthlyTransactions.stream()
+                .filter(transaction -> transaction.getType() == TransactionType.EXPENSE)
+                .map(Transaction::getAmount)
+                .max(BigDecimal::compareTo)
+                .orElse(BigDecimal.ZERO);
+        SpendingStateSummary spendingStates = summarizeSpendingStates(monthlyTransactions);
 
         // Budget alerts
         List<BudgetAlert> budgetAlerts = getBudgetAlerts(userId);
 
         return new DashboardSummary(income, expenses, net, savingsRate,
-                totalBalance, accountBalances, monthlyTrend, topCategories, budgetAlerts);
+                transactionCount, highestExpense, totalBalance, accountBalances,
+                monthlyTrend, topCategories, topCategories, spendingStates, budgetAlerts);
     }
 
     @Transactional(readOnly = true)
@@ -120,17 +137,38 @@ public class AnalyticsService {
 
     @Transactional(readOnly = true)
     public List<CategorySpend> getCategoryBreakdown(Long userId, LocalDate start, LocalDate end) {
-        List<Object[]> rows = transactionRepository.getCategoryBreakdown(userId, start, end);
-        BigDecimal total = rows.stream()
-                .map(r -> (BigDecimal) r[2])
+        List<Transaction> transactions = transactionRepository
+                .findByUserIdAndTransactionDateBetweenOrderByTransactionDateAscCreatedAtAsc(userId, start, end);
+        Map<String, BigDecimal> totalsByCategory = new LinkedHashMap<>();
+
+        for (Transaction transaction : transactions) {
+            if (transaction.getType() != TransactionType.EXPENSE) {
+                continue;
+            }
+
+            String categoryName = transactionClassificationService.resolveCategoryName(transaction);
+            totalsByCategory.merge(categoryName, transaction.getAmount(), BigDecimal::add);
+        }
+
+        BigDecimal total = totalsByCategory.values().stream()
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        return rows.stream().map(r -> {
-            BigDecimal amount = (BigDecimal) r[2];
+        List<CategorySpend> categoryBreakdown = new ArrayList<>();
+        for (Map.Entry<String, BigDecimal> entry : totalsByCategory.entrySet()) {
+            BigDecimal amount = entry.getValue();
             double pct = total.compareTo(BigDecimal.ZERO) > 0
                     ? amount.divide(total, 4, RoundingMode.HALF_UP).doubleValue() * 100 : 0;
-            return new CategorySpend((String) r[0], (String) r[1], amount, pct);
-        }).toList();
+            categoryBreakdown.add(new CategorySpend(
+                    entry.getKey(),
+                    transactionClassificationService.defaultCategoryColor(entry.getKey(), TransactionType.EXPENSE),
+                    amount,
+                    pct
+            ));
+        }
+
+        return categoryBreakdown.stream()
+                .sorted(Comparator.comparing(CategorySpend::amount).reversed())
+                .toList();
     }
 
     private List<BudgetAlert> getBudgetAlerts(Long userId) {
@@ -141,5 +179,27 @@ public class AnalyticsService {
                         b.percentUsed() >= 100 ? "EXCEEDED" : "WARNING"
                 ))
                 .toList();
+    }
+
+    private SpendingStateSummary summarizeSpendingStates(List<Transaction> transactions) {
+        long low = 0;
+        long normal = 0;
+        long high = 0;
+
+        for (Transaction transaction : transactions) {
+            if (transaction.getType() != TransactionType.EXPENSE) {
+                continue;
+            }
+
+            Transaction.SpendingState state = transactionClassificationService.classifySpendingState(transaction.getAmount());
+
+            switch (state) {
+                case LOW -> low++;
+                case HIGH -> high++;
+                default -> normal++;
+            }
+        }
+
+        return new SpendingStateSummary(low, normal, high);
     }
 }
