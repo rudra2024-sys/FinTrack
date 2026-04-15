@@ -2,6 +2,7 @@ package com.fintrack.parser;
 
 import com.fintrack.entity.Transaction.TransactionType;
 import com.fintrack.exception.ApiException;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.text.PDFTextStripper;
@@ -15,9 +16,13 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeFormatterBuilder;
 import java.time.format.DateTimeParseException;
+import java.time.temporal.ChronoField;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
@@ -25,6 +30,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 @Component
+@Slf4j
 public class PdfStatementParser implements StatementParser {
 
     private static final Pattern DATE_AT_START_PATTERN = Pattern.compile(
@@ -33,10 +39,38 @@ public class PdfStatementParser implements StatementParser {
     private static final Pattern DATE_ANYWHERE_PATTERN = Pattern.compile(
             "(\\b\\d{4}-\\d{2}-\\d{2}\\b|\\b\\d{1,2}[/-]\\d{1,2}[/-]\\d{2,4}\\b|\\b\\d{1,2}\\s+[A-Za-z]{3,9}\\s+\\d{2,4}\\b)"
     );
+    private static final Pattern TIME_PATTERN = Pattern.compile(
+            "\\b(\\d{1,2}:\\d{2}(?::\\d{2})?\\s*(?:AM|PM))\\b",
+            Pattern.CASE_INSENSITIVE
+    );
     private static final Pattern AMOUNT_PATTERN = Pattern.compile(
             "([+-]?\\d[\\d,]*\\.\\d{2}|[+-]?\\d[\\d,]*)\\s*(CR|DR|CREDIT|DEBIT)?\\b",
             Pattern.CASE_INSENSITIVE
     );
+    private static final Pattern GOOGLE_PAY_TRANSACTION_PATTERN = Pattern.compile(
+            "(?<date>\\d{1,2}\\s+[A-Za-z]{3},\\s+\\d{4})\\s+"
+                    + "(?<time>\\d{1,2}:\\d{2}(?::\\d{2})?\\s*(?:AM|PM))\\s+"
+                    + "(?<action>Paid|Sent|Received)\\s+"
+                    + "(?<amount>\\d[\\d,]*\\.\\d{2})\\s+"
+                    + "(?<direction>To|From)\\s+"
+                    + "(?<entity>.*?)(?=(?:\\d{1,2}\\s+[A-Za-z]{3},\\s+\\d{4}\\s+\\d{1,2}:\\d{2}(?::\\d{2})?\\s*(?:AM|PM)\\s+(?:Paid|Sent|Received)\\s+\\d[\\d,]*\\.\\d{2}\\s+(?:To|From)\\s+)|Transaction\\s+Count\\s*:\\s*\\d+|$)",
+            Pattern.CASE_INSENSITIVE | Pattern.DOTALL
+    );
+
+    private static final DateTimeFormatter GOOGLE_PAY_DATE_FORMAT = new DateTimeFormatterBuilder()
+            .parseCaseInsensitive()
+            .appendPattern("d MMM, uuuu")
+            .toFormatter(Locale.ENGLISH);
+    private static final DateTimeFormatter TIME_FORMATTER = new DateTimeFormatterBuilder()
+            .parseCaseInsensitive()
+            .appendPattern("h:mm")
+            .optionalStart()
+            .appendLiteral(':')
+            .appendValue(ChronoField.SECOND_OF_MINUTE, 2)
+            .optionalEnd()
+            .appendLiteral(' ')
+            .appendPattern("a")
+            .toFormatter(Locale.ENGLISH);
 
     private static final List<DateTimeFormatter> DATE_FORMATS = List.of(
             DateTimeFormatter.ISO_LOCAL_DATE,
@@ -48,10 +82,10 @@ public class PdfStatementParser implements StatementParser {
             DateTimeFormatter.ofPattern("dd-MM-uuuu"),
             DateTimeFormatter.ofPattern("d-M-uu"),
             DateTimeFormatter.ofPattern("dd-MM-uu"),
-            DateTimeFormatter.ofPattern("d MMM uuuu", Locale.ENGLISH),
-            DateTimeFormatter.ofPattern("dd MMM uuuu", Locale.ENGLISH),
-            DateTimeFormatter.ofPattern("d MMMM uuuu", Locale.ENGLISH),
-            DateTimeFormatter.ofPattern("dd MMMM uuuu", Locale.ENGLISH)
+            new DateTimeFormatterBuilder().parseCaseInsensitive().appendPattern("d MMM uuuu").toFormatter(Locale.ENGLISH),
+            new DateTimeFormatterBuilder().parseCaseInsensitive().appendPattern("dd MMM uuuu").toFormatter(Locale.ENGLISH),
+            new DateTimeFormatterBuilder().parseCaseInsensitive().appendPattern("d MMMM uuuu").toFormatter(Locale.ENGLISH),
+            new DateTimeFormatterBuilder().parseCaseInsensitive().appendPattern("dd MMMM uuuu").toFormatter(Locale.ENGLISH)
     );
 
     @Override
@@ -92,14 +126,95 @@ public class PdfStatementParser implements StatementParser {
             return List.of();
         }
 
-        List<String> logicalLines = combineWrappedLines(rawText);
+        List<ParsedStatementRow> googlePayRows = parseGooglePayTransactions(rawText);
+        if (!googlePayRows.isEmpty()) {
+            return googlePayRows;
+        }
+
+        return parseGenericTransactions(rawText);
+    }
+
+    private List<ParsedStatementRow> parseGooglePayTransactions(String rawText) {
+        String normalized = normalizeDocument(rawText);
         List<ParsedStatementRow> rows = new ArrayList<>();
-        for (String line : logicalLines) {
-            ParsedStatementRow row = tryParseLine(line);
+        Matcher matcher = GOOGLE_PAY_TRANSACTION_PATTERN.matcher(normalized);
+
+        while (matcher.find()) {
+            ParsedStatementRow row = buildGooglePayRow(matcher);
             if (row != null) {
                 rows.add(row);
             }
         }
+
+        if (rows.isEmpty()) {
+            return List.of();
+        }
+
+        int rejectedLines = (int) Arrays.stream(normalized.split("\\R"))
+                .map(this::sanitizeLine)
+                .filter(line -> !line.isBlank())
+                .filter(this::looksLikeTransactionCandidate)
+                .filter(line -> !GOOGLE_PAY_TRANSACTION_PATTERN.matcher(line).matches())
+                .filter(line -> !isNonTransactionLine(line))
+                .count();
+
+        log.info("Parsed {} valid transactions from Google Pay PDF text", rows.size());
+        log.info("Rejected {} invalid lines during Google Pay PDF parsing", rejectedLines);
+        return rows;
+    }
+
+    private ParsedStatementRow buildGooglePayRow(Matcher matcher) {
+        try {
+            LocalDate transactionDate = LocalDate.parse(matcher.group("date").trim(), GOOGLE_PAY_DATE_FORMAT);
+            LocalTime transactionTime = parseTime(matcher.group("time"));
+            String action = matcher.group("action").trim();
+            BigDecimal amount = parseMoney(matcher.group("amount"));
+            String entity = cleanEntity(matcher.group("entity"));
+
+            if (entity.isBlank()) {
+                return null;
+            }
+
+            TransactionType type = "received".equalsIgnoreCase(action)
+                    ? TransactionType.INCOME
+                    : TransactionType.EXPENSE;
+            String notes = "Parsed from PDF statement: " + action + " " + matcher.group("amount").trim()
+                    + " " + matcher.group("direction").trim() + " " + entity;
+
+            return new ParsedStatementRow(
+                    transactionDate,
+                    transactionTime,
+                    entity,
+                    amount.abs(),
+                    type,
+                    entity,
+                    notes
+            );
+        } catch (DateTimeParseException ex) {
+            log.debug("Skipping Google Pay row due to date/time parsing failure: {}", matcher.group());
+            return null;
+        }
+    }
+
+    private List<ParsedStatementRow> parseGenericTransactions(String rawText) {
+        List<String> logicalLines = combineWrappedLines(rawText);
+        List<ParsedStatementRow> rows = new ArrayList<>();
+        int rejectedLines = 0;
+
+        for (String line : logicalLines) {
+            ParsedStatementRow row = tryParseLine(line);
+            if (row != null) {
+                rows.add(row);
+            } else if (looksLikeTransactionCandidate(line) && !isNonTransactionLine(line)) {
+                rejectedLines++;
+            }
+        }
+
+        if (!rows.isEmpty()) {
+            log.info("Parsed {} valid transactions from generic PDF text", rows.size());
+            log.info("Rejected {} invalid lines during generic PDF parsing", rejectedLines);
+        }
+
         return rows;
     }
 
@@ -170,8 +285,8 @@ public class PdfStatementParser implements StatementParser {
         StringBuilder current = new StringBuilder();
 
         for (String rawLine : rawText.split("\\R")) {
-            String line = sanitize(rawLine);
-            if (line.isBlank()) {
+            String line = sanitizeLine(rawLine);
+            if (line.isBlank() || isNonTransactionLine(line)) {
                 continue;
             }
 
@@ -192,8 +307,8 @@ public class PdfStatementParser implements StatementParser {
 
         if (logicalLines.isEmpty()) {
             for (String rawLine : rawText.split("\\R")) {
-                String line = sanitize(rawLine);
-                if (!line.isBlank()) {
+                String line = sanitizeLine(rawLine);
+                if (!line.isBlank() && !isNonTransactionLine(line)) {
                     logicalLines.add(line);
                 }
             }
@@ -225,14 +340,20 @@ public class PdfStatementParser implements StatementParser {
 
         BigDecimal amount = parseMoney(transactionAmountToken.value());
         TransactionType type = detectType(line, transactionAmountToken.indicator(), amount);
+        LocalTime time = extractTime(line);
         String description = extractDescription(line, dateMatcher.end(), transactionAmountToken.start());
+        if (description.isBlank()) {
+            return null;
+        }
 
+        String merchant = extractMerchant(description);
         return new ParsedStatementRow(
                 date,
-                description,
+                time,
+                merchant,
                 amount.abs(),
                 type,
-                extractMerchant(description),
+                merchant,
                 "Imported from PDF statement"
         );
     }
@@ -281,23 +402,48 @@ public class PdfStatementParser implements StatementParser {
 
         description = description.replaceAll("^(value\\s+date|txn\\s+date|transaction\\s+date)\\s*", "");
         description = description.replaceAll("\\b\\d{1,2}[/-]\\d{1,2}[/-]\\d{2,4}\\b", " ");
-        description = description.replaceAll("\\s{2,}", " ").trim();
-
-        if (description.isBlank()) {
-            description = "Imported PDF Transaction";
-        }
-        return description;
+        description = description.replaceAll("\\b\\d{1,2}:\\d{2}(?::\\d{2})?\\s*(?:AM|PM)\\b", " ");
+        return description.replaceAll("\\s{2,}", " ").trim();
     }
 
     private boolean startsWithDate(String line) {
         return DATE_AT_START_PATTERN.matcher(line).find();
     }
 
-    private String sanitize(String raw) {
+    private String normalizeDocument(String raw) {
         return raw == null ? "" : raw
                 .replace('\u00A0', ' ')
+                .replace("â‚¹", "")
                 .replace("₹", "")
                 .replace("INR", "")
+                .replaceAll("[\\t\\x0B\\f\\r]+", " ")
+                .replaceAll(" +", " ")
+                .replaceAll("\\n{2,}", "\n")
+                .trim();
+    }
+
+    private String sanitizeLine(String raw) {
+        return normalizeDocument(raw).trim();
+    }
+
+    private boolean isNonTransactionLine(String line) {
+        String normalized = line.toLowerCase(Locale.ENGLISH);
+        return normalized.startsWith("google pay statement")
+                || normalized.matches("^[a-z]+\\s+\\d{4}$")
+                || normalized.startsWith("transaction count");
+    }
+
+    private boolean looksLikeTransactionCandidate(String line) {
+        String normalized = line.toLowerCase(Locale.ENGLISH);
+        return DATE_ANYWHERE_PATTERN.matcher(line).find()
+                || normalized.contains("paid")
+                || normalized.contains("sent")
+                || normalized.contains("received");
+    }
+
+    private String cleanEntity(String rawEntity) {
+        return sanitizeLine(rawEntity)
+                .replaceAll("(?i)transaction\\s+count\\s*:\\s*\\d+", "")
                 .replaceAll("\\s{2,}", " ")
                 .trim();
     }
@@ -318,6 +464,25 @@ public class PdfStatementParser implements StatementParser {
             }
         }
         return null;
+    }
+
+    private LocalTime parseTime(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        try {
+            return LocalTime.parse(raw.trim().toUpperCase(Locale.ENGLISH), TIME_FORMATTER);
+        } catch (DateTimeParseException ex) {
+            return null;
+        }
+    }
+
+    private LocalTime extractTime(String line) {
+        Matcher matcher = TIME_PATTERN.matcher(line);
+        if (!matcher.find()) {
+            return null;
+        }
+        return parseTime(matcher.group(1));
     }
 
     private BigDecimal parseMoney(String raw) {

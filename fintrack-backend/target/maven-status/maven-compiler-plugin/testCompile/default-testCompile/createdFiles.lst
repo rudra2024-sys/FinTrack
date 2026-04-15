@@ -1,0 +1,3 @@
+com\fintrack\parser\PdfStatementParserTest.class
+com\fintrack\ai\categorization\RuleBasedCategorizerTest.class
+com\fintrack\entity\TransactionSpendingStateTest.class

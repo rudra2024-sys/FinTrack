@@ -11,11 +11,13 @@ com\fintrack\service\RecurringTransactionService.class
 com\fintrack\entity\Budget.class
 com\fintrack\dto\savings\SavingsDTOs$ContributeRequest.class
 com\fintrack\entity\Statement$StatementStatus.class
+com\fintrack\service\AnalyticsService$1.class
 com\fintrack\statement\StatementService.class
 com\fintrack\entity\Transaction$TransactionBuilder.class
 com\fintrack\entity\Account$AccountType.class
 com\fintrack\service\TransactionService.class
 com\fintrack\controller\CategoryController$CategoryResponse.class
+com\fintrack\controller\UserProfileController$UpdateProfileRequest.class
 com\fintrack\entity\User$UserBuilder.class
 com\fintrack\dto\analytics\AnalyticsDTOs$CategorySpend.class
 com\fintrack\dto\auth\AuthDTOs$UserInfo.class
@@ -39,6 +41,7 @@ com\fintrack\dto\analytics\AnalyticsDTOs$MonthlyData.class
 com\fintrack\exception\GlobalExceptionHandler.class
 com\fintrack\entity\RefreshToken$RefreshTokenBuilder.class
 com\fintrack\service\BudgetService.class
+com\fintrack\controller\SystemController.class
 com\fintrack\dto\insights\InsightDTOs$PatternItem.class
 com\fintrack\dto\savings\SavingsDTOs$ContributionResponse.class
 com\fintrack\dto\transaction\TransactionDTOs$Response.class
@@ -65,12 +68,14 @@ com\fintrack\dto\auth\AuthDTOs$RefreshRequest.class
 com\fintrack\parser\PdfStatementParser$AmountToken.class
 com\fintrack\dto\intelligence\IntelligenceDTOs$PdfIntelligenceResponse.class
 com\fintrack\insights\InsightService.class
+com\fintrack\config\DemoDataConfig.class
 com\fintrack\dto\auth\AuthDTOs$TokenResponse.class
 com\fintrack\repository\RefreshTokenRepository.class
 com\fintrack\controller\SavingsGoalController.class
 com\fintrack\dto\auth\AuthDTOs$RegisterRequest.class
 com\fintrack\controller\AuthController.class
 com\fintrack\dto\budget\BudgetDTOs$CreateRequest.class
+com\fintrack\dto\analytics\AnalyticsDTOs$SpendingStateSummary.class
 com\fintrack\dto\intelligence\IntelligenceDTOs.class
 com\fintrack\dto\insights\InsightDTOs$RecommendationItem.class
 com\fintrack\dto\savings\SavingsDTOs.class
@@ -85,9 +90,11 @@ com\fintrack\dto\intelligence\IntelligenceDTOs$IntelligenceResponse.class
 com\fintrack\dto\transaction\TransactionDTOs.class
 com\fintrack\repository\CategoryRepository.class
 com\fintrack\dto\insights\InsightDTOs.class
+com\fintrack\entity\Transaction$SpendingState.class
 com\fintrack\controller\RecurringTransactionController.class
 com\fintrack\entity\Account.class
 com\fintrack\dto\account\AccountDTOs$CreateRequest.class
+com\fintrack\service\TransactionClassificationService.class
 com\fintrack\statement\StatementController.class
 com\fintrack\config\JpaConfig.class
 com\fintrack\config\SecurityConfig.class
@@ -98,6 +105,7 @@ com\fintrack\dto\intelligence\IntelligenceDTOs$AlertResponse.class
 com\fintrack\insights\InsightsController.class
 com\fintrack\security\SecurityUtils.class
 com\fintrack\dto\statement\StatementDTOs$ListResponse.class
+com\fintrack\controller\UserProfileController$UserProfileDTO.class
 com\fintrack\dto\goals\FinancialGoalDTOs$UpsertRequest.class
 com\fintrack\dto\recurring\RecurringDTOs$CreateRequest.class
 com\fintrack\entity\RecurringTransaction$Frequency.class
@@ -138,6 +146,7 @@ com\fintrack\repository\FinancialGoalRepository.class
 com\fintrack\parser\ParsedStatementRow.class
 com\fintrack\entity\Category.class
 com\fintrack\parser\StatementParser.class
+com\fintrack\controller\UserProfileController.class
 com\fintrack\entity\Transaction$TransactionType.class
 com\fintrack\controller\CategoryController$CategoryRequest.class
 com\fintrack\repository\BudgetRepository.class

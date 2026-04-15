@@ -67,16 +67,16 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
             @Param("endDate") LocalDate endDate
     );
 
-    // Monthly summary for charts
+    // Monthly summary for charts - H2 compatible using DATEADD and DAYOFMONTH
     @Query(value = """
         SELECT
-            DATE_TRUNC('month', transaction_date) AS month,
+            DATEADD('DAY', -DAYOFMONTH(transaction_date) + 1, transaction_date) AS month,
             type,
             SUM(amount) AS total
         FROM transactions
         WHERE user_id = :userId
           AND transaction_date >= :startDate
-        GROUP BY DATE_TRUNC('month', transaction_date), type
+        GROUP BY DATEADD('DAY', -DAYOFMONTH(transaction_date) + 1, transaction_date), type
         ORDER BY month
         """, nativeQuery = true)
     List<Object[]> getMonthlySummary(

@@ -1,10 +1,12 @@
 package com.fintrack.dto.transaction;
 
+import com.fintrack.entity.Transaction.SpendingState;
 import com.fintrack.entity.Transaction.TransactionType;
 import jakarta.validation.constraints.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalTime;
 
 public class TransactionDTOs {
 
@@ -17,6 +19,7 @@ public class TransactionDTOs {
             @Size(max = 100) String merchant,
             String notes,
             @NotNull LocalDate transactionDate,
+            LocalTime transactionTime,
             String tags
     ) {}
 
@@ -29,6 +32,7 @@ public class TransactionDTOs {
             @Size(max = 100) String merchant,
             String notes,
             LocalDate transactionDate,
+            LocalTime transactionTime,
             String tags
     ) {}
 
@@ -46,6 +50,10 @@ public class TransactionDTOs {
             String merchant,
             String notes,
             LocalDate transactionDate,
+            String transactionTime,
+            String entity,
+            SpendingState state,
+            SpendingState hmmState,
             Boolean isRecurring,
             String tags,
             String createdAt

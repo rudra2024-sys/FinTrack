@@ -12,10 +12,13 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
+import java.time.format.DateTimeFormatter;
 
 @Service
 @RequiredArgsConstructor
 public class FinancialIntelligenceService {
+
+    private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm");
 
     private final TransactionRepository transactionRepository;
     private final AiMlGateway aiMlGateway;
@@ -59,7 +62,7 @@ public class FinancialIntelligenceService {
     private MlTransaction toMlTransaction(Transaction transaction) {
         return new MlTransaction(
                 transaction.getTransactionDate(),
-                null,
+                transaction.getTransactionTime() != null ? transaction.getTransactionTime().format(TIME_FORMATTER) : null,
                 transaction.getType() == Transaction.TransactionType.INCOME ? "credit" : "debit",
                 transaction.getMerchant() != null && !transaction.getMerchant().isBlank()
                         ? transaction.getMerchant()

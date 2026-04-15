@@ -1,4 +1,4 @@
-﻿const API_BASES = ["http://localhost:8080/api", "http://localhost:8081/api"];
+﻿const API_BASES = ["http://localhost:8081/api", "http://localhost:8080/api"];
 const TX_PAGE_SIZE = 15;
 const DASH_TX_PAGE_SIZE = 8;
 const CATEGORY_COLORS = ["#c8f000", "#00e5ff", "#ff4d00", "#e8e4dc", "#7bd389", "#ff8fab"];
@@ -258,7 +258,7 @@ function handleUnauthorized() {
 }
 
 async function apiRequest(endpoint, options = {}) {
-  const { method = "GET", body = null, headers = {}, silent = false } = options;
+  const { method = "GET", body = null, headers = {}, silent = false, throwOnError = false } = options;
   const path = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
   const bases = getApiBases();
   let lastError = null;
@@ -288,7 +288,7 @@ async function apiRequest(endpoint, options = {}) {
         : await response.text().catch(() => null);
       console.log("[API RESPONSE]", response.status, url, payload);
 
-      if (response.status === 401) {
+      if (response.status === 401 || response.status === 403) {
         handleUnauthorized();
         return null;
       }
@@ -307,12 +307,17 @@ async function apiRequest(endpoint, options = {}) {
     } catch (error) {
       lastError = error;
       console.error("[API RESPONSE]", url, error);
-      if (index < bases.length - 1) {
+      const isNetworkError = error instanceof TypeError;
+      if (isNetworkError && index < bases.length - 1) {
         continue;
       }
+      break;
     }
   }
 
+  if (throwOnError && lastError) {
+    throw lastError;
+  }
   if (!silent) {
     showFailure(lastError?.message || `Request failed for ${path}`);
   }
@@ -321,14 +326,20 @@ async function apiRequest(endpoint, options = {}) {
 function normalizeTransaction(transaction) {
   const type = normalizeType(transaction.type || (asNumber(transaction.amount) >= 0 ? "INCOME" : "EXPENSE"));
   const date = transaction.transactionDate || transaction.date || "";
-  const state = normalizeHmmState(transaction.hmmState || transaction.hmm_state || APP_STATE.hmmByDate[date]);
+  const state = normalizeHmmState(
+    transaction.state
+    || transaction.spendingState
+    || transaction.hmmState
+    || transaction.hmm_state,
+  );
   return {
     id: transaction.id,
-    description: transaction.description || transaction.merchant || transaction.name || "Transaction",
+    description: transaction.description || transaction.entity || transaction.merchant || transaction.name || "Transaction",
     subText: transaction.notes || transaction.merchant || "",
     category: transaction.categoryName || transaction.category || "Uncategorized",
     accountName: transaction.accountName || transaction.account || "—",
     date,
+    time: transaction.transactionTime || transaction.time || "",
     amount: asNumber(transaction.amount),
     type,
     isRecurring: Boolean(transaction.isRecurring || transaction.is_recurring),
@@ -640,7 +651,9 @@ function renderDashboardInsights() {
     setText("dash-topMerchantCount", `${topMerchant[1]} transactions`);
   }
 
-  const unusualAmount = APP_STATE.transactions.reduce((max, transaction) => Math.max(max, transaction.amount), 0);
+  const unusualAmount = APP_STATE.transactions
+    .filter((transaction) => transaction.type === "EXPENSE")
+    .reduce((max, transaction) => Math.max(max, transaction.amount), 0);
   setText("dash-unusualAmount", formatCurrency(unusualAmount));
   setText("dash-recurringCount", String(APP_STATE.transactions.filter((transaction) => transaction.isRecurring).length));
 }
@@ -1200,7 +1213,7 @@ async function loadAccounts() {
 
 async function createAccount() {
   const name = document.getElementById("account-name")?.value?.trim();
-  const type = document.getElementById("account-type")?.value;
+  const type = document.getElementById("account-type")?.value || "SAVINGS";
   const balance = document.getElementById("account-balance")?.value;
   const institution = document.getElementById("account-institution")?.value?.trim();
 
@@ -1208,18 +1221,38 @@ async function createAccount() {
     showFailure("Please enter an account name.");
     return;
   }
+  if (!type) {
+    showFailure("Please choose an account type.");
+    return;
+  }
 
-  const response = await apiRequest("/accounts", {
-    method: "POST",
-    body: {
-      name,
-      type,
-      initialBalance: balance ? Number(balance) : 0,
-      institution: institution || null,
-      currency: "INR",
-      color: "#c8f000",
-    },
-  });
+  let initialBalance = 0;
+  if (balance != null && String(balance).trim() !== "") {
+    initialBalance = Number(balance);
+    if (!Number.isFinite(initialBalance)) {
+      showFailure("Initial balance must be a valid number.");
+      return;
+    }
+  }
+
+  let response = null;
+  try {
+    response = await apiRequest("/accounts", {
+      method: "POST",
+      throwOnError: true,
+      body: {
+        name,
+        type,
+        initialBalance,
+        institution: institution || null,
+        currency: "INR",
+        color: "#c8f000",
+      },
+    });
+  } catch (error) {
+    showFailure(error?.message || "Account creation failed.");
+    return;
+  }
 
   if (!response?.id) {
     showFailure("Account creation failed.");

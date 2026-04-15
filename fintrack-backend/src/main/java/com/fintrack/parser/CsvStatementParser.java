@@ -92,6 +92,7 @@ public class CsvStatementParser implements StatementParser {
 
                 rows.add(new ParsedStatementRow(
                         transactionDate,
+                        null,
                         description == null || description.isBlank() ? "Imported Transaction" : description.trim(),
                         parsedAmount.amount(),
                         parsedAmount.type(),

@@ -9,6 +9,8 @@ import com.fintrack.parser.ParsedStatementRow;
 import com.fintrack.parser.StatementParser;
 import com.fintrack.parser.StatementParserRegistry;
 import com.fintrack.repository.*;
+import com.fintrack.service.TransactionClassificationService;
+import lombok.extern.slf4j.Slf4j;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -21,15 +23,35 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeFormatterBuilder;
+import java.time.format.DateTimeParseException;
+import java.time.temporal.ChronoField;
 import java.util.ArrayList;
 import java.util.HexFormat;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import java.util.HashSet;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class StatementService {
     private static final int VARCHAR_255_SAFE_LIMIT = 240;
+    private static final DateTimeFormatter ML_TIME_FORMATTER = new DateTimeFormatterBuilder()
+            .parseCaseInsensitive()
+            .appendPattern("h:mm")
+            .optionalStart()
+            .appendLiteral(':')
+            .appendValue(ChronoField.SECOND_OF_MINUTE, 2)
+            .optionalEnd()
+            .appendLiteral(' ')
+            .appendPattern("a")
+            .toFormatter(Locale.ENGLISH);
 
     private final StatementRepository statementRepository;
     private final TransactionRepository transactionRepository;
@@ -38,6 +60,7 @@ public class StatementService {
     private final CategoryRepository categoryRepository;
     private final StatementParserRegistry statementParserRegistry;
     private final AiMlGateway aiMlGateway;
+    private final TransactionClassificationService transactionClassificationService;
 
     @Transactional
     public UploadResponse upload(
@@ -78,21 +101,32 @@ public class StatementService {
 
         try {
             List<ParsedStatementRow> parsedRows = parseRows(file, statementParser);
-            List<Category> categories = categoryRepository.findAllForUser(userId);
+            if (parsedRows.isEmpty()) {
+                throw new ApiException("No valid transactions could be extracted from the uploaded statement", HttpStatus.BAD_REQUEST);
+            }
+            Map<String, Category> categoriesByName = new LinkedHashMap<>();
+            categoryRepository.findAllForUser(userId)
+                    .forEach(category -> categoriesByName.put(category.getName().toLowerCase(Locale.ENGLISH), category));
             List<Transaction> importedTransactions = new ArrayList<>();
             int duplicateCount = 0;
             BigDecimal totalIncome = BigDecimal.ZERO;
             BigDecimal totalExpenses = BigDecimal.ZERO;
+            Set<String> batchImportHashes = new HashSet<>();
 
             for (ParsedStatementRow row : parsedRows) {
                 String importHash = buildImportHash(accountId, row);
-                if (transactionRepository.existsByUserIdAndImportHash(userId, importHash)) {
+                if (!batchImportHashes.add(importHash) || transactionRepository.existsByUserIdAndImportHash(userId, importHash)) {
                     duplicateCount++;
                     continue;
                 }
 
-                String aiCategoryLabel = aiMlGateway.categorize(row.description(), row.type());
-                Category category = resolveCategory(categories, aiCategoryLabel, row.type());
+                String categoryLabel = transactionClassificationService.classifyCategory(
+                        row.type(),
+                        row.description(),
+                        row.merchant(),
+                        row.notes()
+                );
+                Category category = resolveCategory(categoriesByName, user, categoryLabel, row.type());
 
                 Transaction transaction = Transaction.builder()
                         .user(user)
@@ -105,9 +139,11 @@ public class StatementService {
                         .merchant(trimToNullable(row.merchant(), VARCHAR_255_SAFE_LIMIT))
                         .notes(trimToNullable(row.notes(), VARCHAR_255_SAFE_LIMIT))
                         .transactionDate(row.transactionDate())
+                        .transactionTime(row.transactionTime())
+                        .spendingState(transactionClassificationService.classifySpendingStateWithLog(row.amount()))
                         .isRecurring(false)
                         .importHash(importHash)
-                        .aiCategoryLabel(trimToNullable(aiCategoryLabel, VARCHAR_255_SAFE_LIMIT))
+                        .aiCategoryLabel(trimToNullable(categoryLabel, VARCHAR_255_SAFE_LIMIT))
                         .importSource(trimToNullable(statement.getSource(), VARCHAR_255_SAFE_LIMIT))
                         .build();
                 importedTransactions.add(transaction);
@@ -120,6 +156,10 @@ public class StatementService {
             }
 
             transactionRepository.saveAll(importedTransactions);
+            log.info("Imported {} unique transactions for statement {}", importedTransactions.size(), statement.getId());
+            if (duplicateCount > 0) {
+                log.info("Skipped {} duplicate transactions for statement {}", duplicateCount, statement.getId());
+            }
 
             if (applyToAccountBalance) {
                 account.setBalance(account.getBalance().add(totalIncome.subtract(totalExpenses)));
@@ -132,7 +172,7 @@ public class StatementService {
             statement.setTotalExpenses(totalExpenses);
             statement.setNotes(trimToNullable(
                     duplicateCount > 0
-                            ? "Processed with " + duplicateCount + " duplicate transaction(s) skipped"
+                            ? "Processed successfully with " + duplicateCount + " duplicate transaction(s) skipped"
                             : "Processed successfully",
                     VARCHAR_255_SAFE_LIMIT
             ));
@@ -186,22 +226,42 @@ public class StatementService {
         return new ListResponse(summaries);
     }
 
-    private Category resolveCategory(List<Category> categories, String label, Transaction.TransactionType type) {
-        if (label != null) {
-            for (Category category : categories) {
-                if (category.getName().equalsIgnoreCase(label)) {
-                    return category;
-                }
-            }
+    private Category resolveCategory(
+            Map<String, Category> categoriesByName,
+            User user,
+            String label,
+            Transaction.TransactionType type
+    ) {
+        String resolvedLabel = firstNonBlank(label, type == Transaction.TransactionType.EXPENSE ? "Others" : "Others");
+        String key = resolvedLabel.toLowerCase(Locale.ENGLISH);
+        Category existing = categoriesByName.get(key);
+        if (existing != null) {
+            return existing;
         }
-        String fallback = type == Transaction.TransactionType.EXPENSE ? "Other" : "Other Income";
-        return categories.stream()
-                .filter(category -> category.getName().equalsIgnoreCase(fallback))
-                .findFirst()
-                .orElse(null);
+
+        Category created = categoryRepository.save(Category.builder()
+                .user(user)
+                .name(resolvedLabel)
+                .type(type == Transaction.TransactionType.INCOME ? Category.CategoryType.INCOME : Category.CategoryType.EXPENSE)
+                .color(transactionClassificationService.defaultCategoryColor(resolvedLabel, type))
+                .icon(transactionClassificationService.defaultCategoryIcon(resolvedLabel, type))
+                .isSystem(false)
+                .build());
+        categoriesByName.put(key, created);
+        return created;
     }
 
     private List<ParsedStatementRow> parseRows(MultipartFile file, StatementParser statementParser) throws IOException {
+        List<ParsedStatementRow> localRows = List.of();
+        try {
+            localRows = statementParser.parse(file);
+            if (!localRows.isEmpty()) {
+                return localRows;
+            }
+        } catch (RuntimeException ex) {
+            log.warn("Local statement parser returned no usable rows, trying ML fallback: {}", ex.getMessage());
+        }
+
         if (isPdf(file)) {
             try {
                 IntelligenceDTOs.PdfExtractionResponse extraction = aiMlGateway.extractPdfStatement(file);
@@ -210,10 +270,10 @@ public class StatementService {
                     return mlRows;
                 }
             } catch (RuntimeException ignored) {
-                // Use the local parser when ML extraction is unavailable or yields no usable rows.
+                log.warn("ML PDF extraction unavailable, using local parser fallback: {}", ignored.getMessage());
             }
         }
-        return statementParser.parse(file);
+        return localRows;
     }
 
     private List<ParsedStatementRow> toParsedRows(IntelligenceDTOs.PdfExtractionResponse extraction) {
@@ -239,6 +299,7 @@ public class StatementService {
 
             rows.add(new ParsedStatementRow(
                     transaction.date(),
+                    parseMlTime(transaction.time()),
                     description,
                     transaction.amount().abs(),
                     type,
@@ -250,12 +311,28 @@ public class StatementService {
     }
 
     private String buildImportHash(Long accountId, ParsedStatementRow row) {
-        String fingerprint = accountId + "|" + row.transactionDate() + "|" + row.description() + "|" + row.amount() + "|" + row.type();
+        String fingerprint = accountId
+                + "|" + row.transactionDate()
+                + "|" + row.transactionTime()
+                + "|" + normalizeFingerprintText(row.description())
+                + "|" + row.amount()
+                + "|" + row.type();
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             return HexFormat.of().formatHex(digest.digest(fingerprint.getBytes(StandardCharsets.UTF_8)));
         } catch (NoSuchAlgorithmException ex) {
             throw new IllegalStateException("SHA-256 should always be available", ex);
+        }
+    }
+
+    private LocalTime parseMlTime(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        try {
+            return LocalTime.parse(raw.trim().toUpperCase(Locale.ENGLISH), ML_TIME_FORMATTER);
+        } catch (DateTimeParseException ex) {
+            return null;
         }
     }
 
@@ -286,4 +363,9 @@ public class StatementService {
         }
         return null;
     }
+
+    private String normalizeFingerprintText(String value) {
+        return value == null ? "" : value.replaceAll("\\s+", " ").trim().toLowerCase(Locale.ENGLISH);
+    }
+
 }
