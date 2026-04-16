@@ -10,7 +10,7 @@
 <style>
 :root{--bg:#0a0a08;--card:#131310;--line:rgba(255,255,255,0.07);--acid:#c8f000;--ember:#ff4d00;--ice:#00e5ff;--offwhite:#e8e4dc;--muted:#5a5a52;--font-display:'Barlow Condensed';--font-body:'Barlow';--font-mono:'IBM Plex Mono'}
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:var(--bg);color:var(--offwhite);font-family:var(--font-body);min-height:100vh;overflow-x:hidden}
+body{background:var(--bg);color:var(--offwhite);font-family:var(--font-body);min-height:100vh;overflow:hidden}
 #shell{display:flex;min-height:100vh}
 #sidebar{width:60px;border-right:1px solid var(--line);display:flex;flex-direction:column;align-items:center;padding:24px 0;position:fixed;left:0;top:0;bottom:0;z-index:200;background:var(--bg)}
 .logo-vert{writing-mode:vertical-rl;text-orientation:mixed;transform:rotate(180deg);font-family:var(--font-display);font-size:13px;font-weight:700;letter-spacing:0.3em;color:var(--offwhite);margin-bottom:28px;text-transform:uppercase}
@@ -28,8 +28,8 @@ body{background:var(--bg);color:var(--offwhite);font-family:var(--font-body);min
 .tn.on{color:var(--acid);border-color:rgba(200,240,0,0.2);background:rgba(200,240,0,0.04)}
 .tb-right{display:flex;align-items:center;gap:20px}
 .clock{font-family:var(--font-mono);font-size:12px;color:#2a2a26;letter-spacing:0.1em}
-#content{padding:0 40px 60px}
-.page{display:none}
+#content{padding:0 40px 60px;overflow-y:auto;height:calc(100vh - 56px)}
+.page{display:none;overflow-anchor:none}
 .page.active{display:block}
 .page-hero{display:flex;align-items:flex-end;justify-content:space-between;padding:40px 0 28px;border-bottom:1px solid var(--line)}
 .page-title{font-family:var(--font-display);font-size:48px;font-weight:900;text-transform:uppercase;color:var(--offwhite)}
@@ -64,7 +64,7 @@ body{background:var(--bg);color:var(--offwhite);font-family:var(--font-body);min
 .alert-success{border-left-color:var(--acid)}
 .alert-info{border-left-color:var(--ice)}
 .filter-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-@media(max-width:720px){#main{margin-left:0}#sidebar{display:none}#topbar{padding:0 20px}#content{padding:0 20px 40px}.grid-5{grid-template-columns:repeat(2,1fr)}.grid-2{grid-template-columns:1fr}.tx-full-header,.tx-full-row{grid-template-columns:1fr}}
+@media(max-width:720px){#main{margin-left:0}#sidebar{display:none}#topbar{padding:0 20px}#content{padding:0 20px 40px;overflow-y:auto;height:calc(100vh - 56px)}.grid-5{grid-template-columns:repeat(2,1fr)}.grid-2{grid-template-columns:1fr}.tx-full-header,.tx-full-row{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -232,7 +232,7 @@ async function handlePdfUpload(file){if(!file||!file.type.includes('pdf')){showT
 
 const PAGE_LOADED={};
 
-function showPage(name){document.querySelectorAll('.page').forEach(el=>el.classList.remove('active'));const target=document.getElementById(`page-${name}`);if(target)target.classList.add('active');document.querySelectorAll('.tn[data-page]').forEach(n=>n.classList.remove('on'));const activeTab=document.querySelector(`.tn[data-page="${name}"]`);if(activeTab)activeTab.classList.add('on');document.querySelectorAll('.nav-icon[data-page]').forEach(n=>n.classList.remove('active'));const activeIcon=document.querySelector(`.nav-icon[data-page="${name}"]`);if(activeIcon)activeIcon.classList.add('active');if(!PAGE_LOADED[name]){PAGE_LOADED[name]=true;if(name==='transactions')loadTransactionsPage(0);if(name==='dashboard')loadDashboardPage();if(name==='budgets')loadBudgetsPage()}}
+function showPage(name){const _c=document.getElementById('content');if(_c)_c.scrollTop=0;document.querySelectorAll('.page').forEach(el=>el.classList.remove('active'));const target=document.getElementById(`page-${name}`);if(target)target.classList.add('active');document.querySelectorAll('.tn[data-page]').forEach(n=>n.classList.remove('on'));const activeTab=document.querySelector(`.tn[data-page="${name}"]`);if(activeTab)activeTab.classList.add('on');document.querySelectorAll('.nav-icon[data-page]').forEach(n=>n.classList.remove('active'));const activeIcon=document.querySelector(`.nav-icon[data-page="${name}"]`);if(activeIcon)activeIcon.classList.add('active');if(!PAGE_LOADED[name]){PAGE_LOADED[name]=true;if(name==='transactions')loadTransactionsPage(0);if(name==='dashboard')loadDashboardPage();if(name==='budgets')loadBudgetsPage()}}
 
 document.querySelectorAll('.tn[data-page],.nav-icon[data-page]').forEach(el=>el.addEventListener('click',()=>showPage(el.dataset.page)));
 
@@ -291,7 +291,7 @@ window.addEventListener('load',()=>{if(DEBUG_API)console.log('[INIT] FinTrack st
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html { scroll-behavior: smooth; }
+html, body { scroll-behavior: auto; overflow: hidden; }
 
 body {
   background: var(--bg);
@@ -492,12 +492,12 @@ body:has(.clickable:hover) #cursor { width: 14px; height: 14px; }
 .brand-tag span { display: block; color: var(--acid); font-size: 8px; letter-spacing: 0.1em; margin-bottom: 1px; }
 
 /* ── CONTENT ── */
-#content { padding: 0 40px 60px; }
+#content { padding: 0 40px 60px; overflow-y: auto; height: calc(100vh - 56px); scroll-behavior: auto; overflow-anchor: none; }
 
 /* ══════════════════════════════════════
    PAGE SYSTEM
 ══════════════════════════════════════ */
-.page { display: none; }
+.page { display: none; overflow-anchor: none; }
 .page.active { display: block; }
 
 .page-hero {
@@ -558,7 +558,7 @@ body:has(.clickable:hover) #cursor { width: 14px; height: 14px; }
 .ticker-wrap::before, .ticker-wrap::after { content: ''; position: absolute; top: 0; bottom: 0; width: 60px; z-index: 2; pointer-events: none; }
 .ticker-wrap::before { left: 0; background: linear-gradient(90deg, var(--surface), transparent); }
 .ticker-wrap::after  { right: 0; background: linear-gradient(-90deg, var(--surface), transparent); }
-.ticker-track { display: flex; gap: 0; white-space: nowrap; animation: ticker 36s linear infinite; padding: 10px 0; }
+.ticker-track { display: flex; gap: 0; white-space: nowrap; animation: ticker 36s linear infinite; padding: 10px 0; will-change: transform; }
 .ticker-track:hover { animation-play-state: paused; }
 @keyframes ticker { from{transform:translateX(0)} to{transform:translateX(-50%)} }
 .tick { display: inline-flex; align-items: center; gap: 12px; padding: 0 40px; border-right: 1px solid var(--line); font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.08em; }
@@ -778,7 +778,7 @@ body:has(.clickable:hover) #cursor { width: 14px; height: 14px; }
 .stat-chip { font-family: var(--font-display); font-size: 20px; font-weight: 700; color: var(--acid); letter-spacing: 0.04em; }
 
 /* ── REVEAL ── */
-.reveal { opacity: 0; transform: translateY(20px); }
+.reveal { opacity: 0; transform: translateY(20px); will-change: opacity, transform; contain: layout style; }
 
 /* ══════════════════════════════════════
    RESPONSIVE
@@ -800,7 +800,7 @@ body:has(.clickable:hover) #cursor { width: 14px; height: 14px; }
 @media (max-width: 720px) {
   #main { margin-left: 0; }
   #sidebar { display: none; }
-  #content { padding: 0 20px 40px; }
+  #content { padding: 0 20px 40px; overflow-y: auto; height: calc(100vh - 56px); scroll-behavior: auto; overflow-anchor: none; }
   #topbar { padding: 0 20px; }
   .hero-number { font-size: 72px; }
   .grid-3 { grid-template-columns: 1fr; }
@@ -842,10 +842,6 @@ body:has(.clickable:hover) #cursor { width: 14px; height: 14px; }
       <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
       <span class="nav-tooltip">Analytics</span>
     </div>
-    <div class="nav-icon clickable" data-page="fuzzy" title="Fuzzy AI">
-      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>
-      <span class="nav-tooltip">Fuzzy AI</span>
-    </div>
     <div class="nav-icon clickable" data-page="dashboard" title="Dashboard">
       <svg viewBox="0 0 24 24"><rect x="2" y="2" width="9" height="11" rx="0.5"/><rect x="13" y="2" width="9" height="7" rx="0.5"/><rect x="2" y="15" width="9" height="7" rx="0.5"/><rect x="13" y="11" width="9" height="11" rx="0.5"/></svg>
       <span class="nav-tooltip">Dashboard</span>
@@ -872,7 +868,6 @@ body:has(.clickable:hover) #cursor { width: 14px; height: 14px; }
           <div class="tn clickable" data-page="goals">Goals</div>
           <div class="tn clickable" data-page="analytics">Analytics</div>
           <div class="tn clickable" data-page="dashboard">Dashboard</div>
-          <div class="tn clickable" data-page="fuzzy">Fuzzy AI</div>
         </div>
       </div>
       <div class="tb-right">
@@ -1202,6 +1197,110 @@ body:has(.clickable:hover) #cursor { width: 14px; height: 14px; }
         </div>
       </div>
 
+      <!-- ══════════════════════════════════════════════════════════ -->
+      <!-- FUZZY LOGIC ENGINE — 4 FIS PANELS (additive, no UI change) -->
+      <!-- ══════════════════════════════════════════════════════════ -->
+
+      <!-- FUZZY RISK PANEL: Multi-variable FIS + MF Visualization -->
+      <div class="reveal" style="margin-top:24px" id="fuzzy-risk-section">
+        <div class="panel-card">
+          <div class="panel-eyebrow">Fuzzy Logic — Financial Risk FIS</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:20px;margin-bottom:24px" id="fuzzy-risk-inputs">
+            <div>
+              <div style="font-family:var(--font-mono);font-size:8px;letter-spacing:0.2em;color:var(--muted);text-transform:uppercase;margin-bottom:6px">Income Stability</div>
+              <div style="font-family:var(--font-display);font-size:26px;font-weight:900;color:var(--acid)" id="fz-income-val">—</div>
+              <div style="font-family:var(--font-mono);font-size:8px;color:var(--muted)" id="fz-income-lbl">/ 100</div>
+            </div>
+            <div>
+              <div style="font-family:var(--font-mono);font-size:8px;letter-spacing:0.2em;color:var(--muted);text-transform:uppercase;margin-bottom:6px">Expense Level</div>
+              <div style="font-family:var(--font-display);font-size:26px;font-weight:900;color:var(--ember)" id="fz-expense-val">—</div>
+              <div style="font-family:var(--font-mono);font-size:8px;color:var(--muted)">% of income</div>
+            </div>
+            <div>
+              <div style="font-family:var(--font-mono);font-size:8px;letter-spacing:0.2em;color:var(--muted);text-transform:uppercase;margin-bottom:6px">Savings Rate</div>
+              <div style="font-family:var(--font-display);font-size:26px;font-weight:900;color:var(--acid)" id="fz-savings-val">—</div>
+              <div style="font-family:var(--font-mono);font-size:8px;color:var(--muted)">%</div>
+            </div>
+            <div>
+              <div style="font-family:var(--font-mono);font-size:8px;letter-spacing:0.2em;color:var(--muted);text-transform:uppercase;margin-bottom:6px">Risk Score</div>
+              <div style="font-family:var(--font-display);font-size:26px;font-weight:900" id="fz-risk-val" style="color:var(--ice)">—</div>
+              <div style="font-family:var(--font-mono);font-size:8px;color:var(--muted)" id="fz-risk-lbl">/ 100</div>
+            </div>
+          </div>
+
+          <!-- Rule firing summary -->
+          <div style="border-top:1px solid var(--line);padding-top:16px;margin-bottom:20px">
+            <div style="font-family:var(--font-mono);font-size:8px;letter-spacing:0.15em;color:var(--muted);text-transform:uppercase;margin-bottom:10px">18-Rule Mamdani FIS Output</div>
+            <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+              <div style="display:flex;align-items:center;gap:8px">
+                <div style="font-family:var(--font-mono);font-size:9px;color:var(--muted)">Risk Label:</div>
+                <div style="font-family:var(--font-display);font-size:14px;font-weight:900;letter-spacing:0.1em;text-transform:uppercase" id="fz-risk-label">—</div>
+              </div>
+              <div style="width:1px;height:20px;background:var(--line)"></div>
+              <div style="display:flex;align-items:center;gap:8px">
+                <div style="font-family:var(--font-mono);font-size:9px;color:var(--muted)">Recommendation:</div>
+                <div style="font-family:var(--font-display);font-size:14px;font-weight:900;letter-spacing:0.1em;text-transform:uppercase;color:var(--ice)" id="fz-recommendation">—</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Membership Function Visualization -->
+          <div style="border-top:1px solid var(--line);padding-top:16px">
+            <div style="font-family:var(--font-mono);font-size:8px;letter-spacing:0.15em;color:var(--muted);text-transform:uppercase;margin-bottom:16px">Membership Functions — Input Variables</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+              <div>
+                <div style="font-family:var(--font-mono);font-size:8px;color:var(--muted);margin-bottom:8px">Income Stability MF</div>
+                <canvas id="mf-income" style="width:100%;height:120px"></canvas>
+              </div>
+              <div>
+                <div style="font-family:var(--font-mono);font-size:8px;color:var(--muted);margin-bottom:8px">Expense Level MF</div>
+                <canvas id="mf-expense" style="width:100%;height:120px"></canvas>
+              </div>
+              <div>
+                <div style="font-family:var(--font-mono);font-size:8px;color:var(--muted);margin-bottom:8px">Savings Rate MF</div>
+                <canvas id="mf-savings" style="width:100%;height:120px"></canvas>
+              </div>
+              <div>
+                <div style="font-family:var(--font-mono);font-size:8px;color:var(--muted);margin-bottom:8px">Financial Risk Output MF</div>
+                <canvas id="mf-risk-out" style="width:100%;height:120px"></canvas>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- FUZZY BUDGET WARNINGS PANEL -->
+      <div class="reveal" style="margin-top:24px" id="fuzzy-budget-section">
+        <div class="panel-card">
+          <div class="panel-eyebrow">Fuzzy Logic — Budget Warning System</div>
+          <div style="font-family:var(--font-mono);font-size:9px;color:var(--muted);margin-bottom:20px">2-input FIS (utilization × days remaining) → Safe / Caution / Warning / Critical — 9 rules, centroid defuzzification</div>
+          <div id="fuzzy-budget-list">
+            <div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);text-align:center;padding:24px 0">No budgets configured yet. Add budgets in the Budgets tab to see fuzzy alerts.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- FUZZY SAVINGS ADVISOR PANEL -->
+      <div class="reveal" style="margin-top:24px" id="fuzzy-savings-section">
+        <div class="panel-card">
+          <div class="panel-eyebrow">Fuzzy Logic — Savings Goal Advisor</div>
+          <div id="fuzzy-savings-content">
+            <div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);text-align:center;padding:24px 0">Loading savings analysis…</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- FUZZY ANOMALY SEVERITY PANEL -->
+      <div class="reveal" style="margin-top:24px" id="fuzzy-anomaly-section">
+        <div class="panel-card">
+          <div class="panel-eyebrow">Fuzzy Logic — Anomaly Severity Scoring</div>
+          <div style="font-family:var(--font-mono);font-size:9px;color:var(--muted);margin-bottom:20px">3-input FIS (amount deviation × category risk × rarity) → Mild / Moderate / Severe — 15 rules replacing binary detection</div>
+          <div id="fuzzy-anomaly-list">
+            <div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);text-align:center;padding:24px 0">Loading anomaly severity analysis…</div>
+          </div>
+        </div>
+      </div>
+
       <!-- TRANSACTION TABLE -->
       <div class="reveal" style="margin-top:24px">
         <div class="panel-card">
@@ -1233,152 +1332,6 @@ body:has(.clickable:hover) #cursor { width: 14px; height: 14px; }
         </div>
       </div>
     </div><!-- /page:dashboard -->
-
-    <!-- ══ PAGE: FUZZY AI ENGINE ══ -->
-    <div class="page" id="page-fuzzy">
-      <div class="page-hero reveal">
-        <div>
-          <div class="page-eyebrow">Fuzzy Logic Engine</div>
-          <div class="page-title">Fuzzy AI</div>
-        </div>
-        <div class="page-hero-right">
-          <button id="fuzzy-refresh-btn" onclick="loadFuzzyPage()" style="font-family:var(--font-mono);font-size:9px;letter-spacing:0.2em;border:1px solid var(--line);background:transparent;color:var(--muted);padding:8px 20px;cursor:pointer;transition:all 0.15s;text-transform:uppercase">↻ Refresh</button>
-        </div>
-      </div>
-
-      <!-- ── RISK ANALYZER ─────────────────────────────────────── -->
-      <div class="reveal" style="margin-top:24px">
-        <div class="panel-card">
-          <div class="panel-eyebrow">System 1 — Financial Risk Analyzer</div>
-          <div class="grid-2-std" style="margin-bottom:24px">
-            <div>
-              <!-- Input sliders -->
-              <div style="display:flex;flex-direction:column;gap:20px">
-                <div>
-                  <div style="display:flex;justify-content:space-between;margin-bottom:6px">
-                    <span style="font-family:var(--font-mono);font-size:9px;letter-spacing:0.15em;color:var(--muted);text-transform:uppercase">Income Stability</span>
-                    <span style="font-family:var(--font-mono);font-size:10px;color:var(--acid)" id="fz-inc-val">50</span>
-                  </div>
-                  <input type="range" id="fz-income" min="0" max="100" value="50" style="width:100%;accent-color:var(--acid)" oninput="document.getElementById('fz-inc-val').textContent=this.value">
-                </div>
-                <div>
-                  <div style="display:flex;justify-content:space-between;margin-bottom:6px">
-                    <span style="font-family:var(--font-mono);font-size:9px;letter-spacing:0.15em;color:var(--muted);text-transform:uppercase">Expense Level</span>
-                    <span style="font-family:var(--font-mono);font-size:10px;color:var(--ember)" id="fz-exp-val">50</span>
-                  </div>
-                  <input type="range" id="fz-expense" min="0" max="100" value="50" style="width:100%;accent-color:var(--ember)" oninput="document.getElementById('fz-exp-val').textContent=this.value">
-                </div>
-                <div>
-                  <div style="display:flex;justify-content:space-between;margin-bottom:6px">
-                    <span style="font-family:var(--font-mono);font-size:9px;letter-spacing:0.15em;color:var(--muted);text-transform:uppercase">Savings Rate</span>
-                    <span style="font-family:var(--font-mono);font-size:10px;color:var(--ice)" id="fz-sav-val">50</span>
-                  </div>
-                  <input type="range" id="fz-savings" min="0" max="100" value="50" style="width:100%;accent-color:var(--ice)" oninput="document.getElementById('fz-sav-val').textContent=this.value">
-                </div>
-                <div>
-                  <div style="display:flex;justify-content:space-between;margin-bottom:6px">
-                    <span style="font-family:var(--font-mono);font-size:9px;letter-spacing:0.15em;color:var(--muted);text-transform:uppercase">Debt Pressure</span>
-                    <span style="font-family:var(--font-mono);font-size:10px;color:#b06fff" id="fz-debt-val">50</span>
-                  </div>
-                  <input type="range" id="fz-debt" min="0" max="100" value="50" style="width:100%;accent-color:#b06fff" oninput="document.getElementById('fz-debt-val').textContent=this.value">
-                </div>
-                <button onclick="runFuzzyRisk()" style="background:var(--acid);color:#000;font-family:var(--font-display);font-size:11px;font-weight:700;letter-spacing:0.15em;padding:12px;text-transform:uppercase;border:none;cursor:pointer;margin-top:4px">Run Analysis</button>
-              </div>
-            </div>
-            <div>
-              <!-- Score outputs -->
-              <div style="display:flex;flex-direction:column;gap:20px;height:100%;justify-content:center">
-                <div style="padding:24px;border:1px solid var(--line);background:rgba(200,240,0,0.04)">
-                  <div style="font-family:var(--font-mono);font-size:9px;letter-spacing:0.2em;color:var(--muted);text-transform:uppercase;margin-bottom:12px">Financial Risk Score</div>
-                  <div style="display:flex;align-items:flex-end;gap:12px">
-                    <div id="fz-risk-score" style="font-family:var(--font-display);font-size:64px;font-weight:900;line-height:1;color:var(--ember)">—</div>
-                    <div style="margin-bottom:12px">
-                      <div id="fz-risk-label" style="font-family:var(--font-mono);font-size:11px;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted)">—</div>
-                      <div style="font-family:var(--font-mono);font-size:9px;color:var(--dim)">/ 100</div>
-                    </div>
-                  </div>
-                  <div style="height:3px;background:var(--dim);margin-top:8px"><div id="fz-risk-bar" style="height:100%;width:0%;background:var(--ember);transition:width 0.8s"></div></div>
-                </div>
-                <div style="padding:24px;border:1px solid var(--line);background:rgba(0,229,255,0.04)">
-                  <div style="font-family:var(--font-mono);font-size:9px;letter-spacing:0.2em;color:var(--muted);text-transform:uppercase;margin-bottom:12px">Recommendation Score</div>
-                  <div style="display:flex;align-items:flex-end;gap:12px">
-                    <div id="fz-rec-score" style="font-family:var(--font-display);font-size:64px;font-weight:900;line-height:1;color:var(--ice)">—</div>
-                    <div style="margin-bottom:12px">
-                      <div id="fz-rec-label" style="font-family:var(--font-mono);font-size:11px;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted)">—</div>
-                      <div style="font-family:var(--font-mono);font-size:9px;color:var(--dim)">/ 100</div>
-                    </div>
-                  </div>
-                  <div style="height:3px;background:var(--dim);margin-top:8px"><div id="fz-rec-bar" style="height:100%;width:0%;background:var(--ice);transition:width 0.8s"></div></div>
-                </div>
-              </div>
-            </div>
-          </div>
-          <!-- Membership function charts -->
-          <div style="font-family:var(--font-mono);font-size:9px;letter-spacing:0.15em;color:var(--muted);text-transform:uppercase;margin-bottom:16px">Membership Functions — Input Variables</div>
-          <div class="grid-4-std">
-            <div><div style="font-family:var(--font-mono);font-size:8px;color:var(--acid);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:8px">Income Stability</div><canvas id="mf-income" style="height:120px"></canvas></div>
-            <div><div style="font-family:var(--font-mono);font-size:8px;color:var(--ember);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:8px">Expense Level</div><canvas id="mf-expense" style="height:120px"></canvas></div>
-            <div><div style="font-family:var(--font-mono);font-size:8px;color:var(--ice);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:8px">Savings Rate</div><canvas id="mf-savings" style="height:120px"></canvas></div>
-            <div><div style="font-family:var(--font-mono);font-size:8px;color:#b06fff;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:8px">Debt Pressure</div><canvas id="mf-debt" style="height:120px"></canvas></div>
-          </div>
-        </div>
-      </div>
-
-      <!-- ── BUDGET WARNING ────────────────────────────────────── -->
-      <div class="reveal" style="margin-top:24px">
-        <div class="panel-card">
-          <div class="panel-eyebrow">System 2 — Budget Warning</div>
-          <div id="fz-budget-list" style="display:flex;flex-direction:column;gap:12px">
-            <div class="page-loading">Computing alert levels<span class="blink">_</span></div>
-          </div>
-        </div>
-      </div>
-
-      <!-- ── SAVINGS ADVISOR ───────────────────────────────────── -->
-      <div class="reveal" style="margin-top:24px">
-        <div class="panel-card">
-          <div class="panel-eyebrow">System 3 — Savings Advisor</div>
-          <div class="grid-3-std">
-            <div style="padding:24px;border:1px solid var(--line);background:rgba(200,240,0,0.04);text-align:center">
-              <div style="font-family:var(--font-mono);font-size:9px;letter-spacing:0.15em;color:var(--muted);text-transform:uppercase;margin-bottom:12px">Strategy</div>
-              <div id="fz-sav-strategy" style="font-family:var(--font-display);font-size:36px;font-weight:900;color:var(--acid)">—</div>
-            </div>
-            <div style="padding:24px;border:1px solid var(--line);background:rgba(0,229,255,0.04);text-align:center">
-              <div style="font-family:var(--font-mono);font-size:9px;letter-spacing:0.15em;color:var(--muted);text-transform:uppercase;margin-bottom:12px">Target Range (INR)</div>
-              <div id="fz-sav-range" style="font-family:var(--font-display);font-size:24px;font-weight:900;color:var(--ice)">— – —</div>
-            </div>
-            <div style="padding:24px;border:1px solid var(--line);background:rgba(255,77,0,0.04)">
-              <div style="font-family:var(--font-mono);font-size:9px;letter-spacing:0.15em;color:var(--muted);text-transform:uppercase;margin-bottom:12px">Advice</div>
-              <div id="fz-sav-advice" style="font-family:var(--font-body);font-size:14px;line-height:1.7;color:var(--offwhite)">—</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- ── ANOMALY SEVERITY TABLE ─────────────────────────────── -->
-      <div class="reveal" style="margin-top:24px;margin-bottom:40px">
-        <div class="panel-card">
-          <div class="panel-eyebrow">System 4 — Anomaly Severity Scoring</div>
-          <div style="overflow-x:auto">
-            <table style="width:100%;border-collapse:collapse" id="fz-anomaly-table">
-              <thead>
-                <tr style="border-bottom:1px solid var(--line)">
-                  <th style="font-family:var(--font-mono);font-size:8px;letter-spacing:0.2em;color:var(--muted);text-transform:uppercase;padding:12px 0;text-align:left;width:8%">#</th>
-                  <th style="font-family:var(--font-mono);font-size:8px;letter-spacing:0.2em;color:var(--muted);text-transform:uppercase;padding:12px 0;text-align:left;width:40%">Description</th>
-                  <th style="font-family:var(--font-mono);font-size:8px;letter-spacing:0.2em;color:var(--muted);text-transform:uppercase;padding:12px 0;text-align:right;width:20%">Amount</th>
-                  <th style="font-family:var(--font-mono);font-size:8px;letter-spacing:0.2em;color:var(--muted);text-transform:uppercase;padding:12px 0;text-align:right;width:16%">Severity</th>
-                  <th style="font-family:var(--font-mono);font-size:8px;letter-spacing:0.2em;color:var(--muted);text-transform:uppercase;padding:12px 0;text-align:right;width:16%">Label</th>
-                </tr>
-              </thead>
-              <tbody id="fz-anomaly-body">
-                <tr><td colspan="5" style="text-align:center;color:var(--muted);padding:32px 0;font-family:var(--font-mono);font-size:10px;letter-spacing:0.15em;text-transform:uppercase">Loading<span class="blink">_</span></td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
-    </div><!-- /page:fuzzy -->
 
     </div><!-- /content -->
   </div><!-- /main -->
@@ -1648,6 +1601,10 @@ tick(); setInterval(tick, 1000);
 const PAGE_LOADED = {};
 
 function showPage(name) {
+  // Reset scroll to top on every page switch — prevents auto-scroll carry-over
+  const contentEl = document.getElementById('content');
+  if (contentEl) contentEl.scrollTop = 0;
+
   document.querySelectorAll('.page').forEach(el => el.classList.remove('active'));
   const target = document.getElementById(`page-${name}`);
   if (target) target.classList.add('active');
@@ -1671,7 +1628,6 @@ function showPage(name) {
     if (name === 'goals') loadGoalsPage();
     if (name === 'analytics') loadAnalyticsPage();
     if (name === 'dashboard') loadDashboardPage();
-    if (name === 'fuzzy') loadFuzzyPage();
   }
 
   if (gsap) {
@@ -2474,312 +2430,412 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-// ════════════════════════════════════════════════
-// FUZZY AI ENGINE
-// ════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════
+// FUZZY LOGIC ENGINE — UI INTEGRATION
+// All 4 FIS systems: Risk, Budget, Savings, Anomaly Severity
+// Hooks into existing loadDashboardPage flow — no existing code changed
+// ═══════════════════════════════════════════════════════════════════
 
-const ML_URL = 'http://localhost:8081/api'; // Spring Boot proxy base
-let _fzMFData = null;             // Cached membership function data
-let _fzCharts = {};               // Chart.js instances
+const ML_BASE = 'http://localhost:8000';
+const fuzzyState = { mfData: null, budgetAlerts: [], savingsAdvice: null, anomalySeverities: [] };
+const mfCharts = {};
 
-// ── Colour helpers ──────────────────────────────────────────
-function fzAlertColor(level) {
-  const map = { Safe:'#c8f000', Caution:'#ffb800', Warning:'#ff6600', Critical:'#ff4d00' };
-  return map[level] || 'var(--muted)';
+// Force reveal fuzzy panels (async load means GSAP has already run)
+function _revealFuzzySections() {
+  ['fuzzy-risk-section','fuzzy-budget-section','fuzzy-savings-section','fuzzy-anomaly-section'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (window.gsap) {
+      gsap.to(el, { opacity: 1, y: 0, duration: 0.5, ease: 'power3.out' });
+    } else {
+      el.style.opacity = '1';
+      el.style.transform = 'none';
+    }
+  });
 }
 
-function fzSeverityColor(score) {
-  if (score >= 70) return 'var(--ember)';
-  if (score >= 40) return '#ffb800';
-  return 'var(--acid)';
-}
-
-// ── Fuzzy API call (uses Spring Boot proxy) ─────────────────
-async function fuzzyApi(path, method = 'GET', body = null) {
+// ─── Main entry: called after dashboard data loads ──────────────────
+async function loadFuzzyInsights() {
   try {
-    const headers = { 'Content-Type': 'application/json' };
-    if (APP_STATE.token) headers['Authorization'] = `Bearer ${APP_STATE.token}`;
-    const opts = { method, headers };
-    if (body) opts.body = JSON.stringify(body);
-    const res = await fetch(`${ML_URL}/ml/fuzzy${path}`, opts);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return await res.json();
-  } catch (err) {
-    if (DEBUG_API) console.warn(`[FUZZY] ${path} failed: ${err.message} — using demo data`);
-    return null;
+    if (!fuzzyState.mfData) {
+      const res = await fetch(`${ML_BASE}/ml/fuzzy/membership-functions`);
+      if (res.ok) fuzzyState.mfData = await res.json();
+    }
+    await Promise.all([
+      renderFuzzyRiskPanel(),
+      renderFuzzyBudgetPanel(),
+      renderFuzzySavingsPanel(),
+      renderFuzzyAnomalyPanel(),
+    ]);
+  } catch(e) {
+    if (DEBUG_API) console.error('[FUZZY] Error loading fuzzy insights:', e);
   }
+  _revealFuzzySections();
 }
 
-// ── Membership function chart rendering ─────────────────────
-function renderMFChart(canvasId, varName, inputValue, data, mainColor) {
-  const ctx = document.getElementById(canvasId);
-  if (!ctx || !data || !data.variables) return;
-  const varData = data.variables[varName];
-  if (!varData) return;
-  const universe = data.universe;
-  const colors = ['#c8f000','var(--ice)','var(--ember)','#b06fff'];
-  const sets = Object.entries(varData);
+// ─── FIS 1: Risk + MF Visualization ─────────────────────────────────
+async function renderFuzzyRiskPanel() {
+  const intel = dashAllData.intelligence;
+  if (!intel || !intel.risk_assessment) return;
+  const ra = intel.risk_assessment;
 
-  if (_fzCharts[canvasId]) { _fzCharts[canvasId].destroy(); }
+  // Update numeric displays
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  set('fz-income-val', ra.income_stability != null ? ra.income_stability.toFixed(1) : '—');
+  set('fz-expense-val', ra.expense_level != null ? ra.expense_level.toFixed(1) : '—');
+  set('fz-savings-val', ra.savings_rate != null ? ra.savings_rate.toFixed(1) : '—');
+  set('fz-risk-val', ra.risk_score != null ? ra.risk_score.toFixed(1) : '—');
 
-  const datasets = sets.map(([label, values], i) => ({
-    label: label.replace(/_/g,' '),
-    data: values,
-    borderColor: colors[i % colors.length],
-    borderWidth: 1.5,
-    backgroundColor: 'transparent',
-    tension: 0.3,
-    pointRadius: 0,
-  }));
+  const riskEl = document.getElementById('fz-risk-val');
+  if (riskEl) {
+    const score = ra.risk_score || 0;
+    riskEl.style.color = score > 65 ? 'var(--ember)' : score > 33 ? 'var(--ice)' : 'var(--acid)';
+  }
 
-  // Vertical line at current input value
-  if (inputValue !== undefined) {
-    datasets.push({
-      label: 'Input',
-      data: universe.map(x => x === Math.round(inputValue) ? 1.05 : null),
-      borderColor: mainColor || 'rgba(255,255,255,0.5)',
-      borderWidth: 1.5,
-      borderDash: [4, 4],
-      backgroundColor: 'transparent',
-      pointRadius: 0,
-      spanGaps: false,
+  const labelEl = document.getElementById('fz-risk-label');
+  if (labelEl) {
+    const risk = (ra.financial_risk || 'unknown').toUpperCase();
+    labelEl.textContent = risk;
+    labelEl.style.color = risk === 'HIGH' ? 'var(--ember)' : risk === 'MEDIUM' ? 'var(--ice)' : 'var(--acid)';
+  }
+
+  const recEl = document.getElementById('fz-recommendation');
+  if (recEl) recEl.textContent = (ra.recommendation || '—').replace(/_/g, ' ').toUpperCase();
+
+  // Draw MF charts
+  if (!fuzzyState.mfData) return;
+  const mf = fuzzyState.mfData;
+  const x = mf.universe;
+  const mfColors = { low: '#c8f000', medium: '#00e5ff', high: '#ff4d00', safe_to_invest: '#c8f000', save_more: '#00e5ff', reduce_spending: '#ffb700', emergency_alert: '#ff4d00' };
+
+  function drawMFChart(canvasId, varData, currentVal) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas || !varData || !Chart) return;
+    if (mfCharts[canvasId]) mfCharts[canvasId].destroy();
+
+    // Use labels array (0..100) + plain y-value arrays — avoids Chart.js 4 scatter parsing issues
+    const labels = x; // [0,1,2,...,100]
+
+    const datasets = Object.entries(varData)
+      .filter(([k]) => k !== 'label')
+      .map(([name, yVals]) => ({
+        label: name.replace(/_/g, ' '),
+        data: yVals,          // plain array of 101 floats
+        borderColor: mfColors[name] || '#5a5a52',
+        backgroundColor: (mfColors[name] || '#5a5a52') + '22',
+        borderWidth: 2,
+        fill: true,
+        pointRadius: 0,
+        tension: 0.1,
+      }));
+
+    // Add vertical marker at current input value
+    if (currentVal != null && !isNaN(currentVal)) {
+      const idx = Math.round(Math.max(0, Math.min(100, currentVal)));
+      const markerData = new Array(101).fill(null);
+      markerData[idx] = 1;
+      // Draw as a thin spike using bar-style overlay via annotation plugin if available,
+      // or just add a special dataset with only the peak point visible
+      datasets.push({
+        label: `Now: ${currentVal.toFixed(1)}`,
+        data: markerData,
+        borderColor: 'rgba(255,255,255,0.7)',
+        backgroundColor: 'rgba(255,255,255,0.1)',
+        borderWidth: 1.5,
+        borderDash: [3, 3],
+        pointRadius: (ctx) => ctx.dataIndex === idx ? 4 : 0,
+        pointBackgroundColor: '#ffffff',
+        fill: false,
+        tension: 0,
+        spanGaps: false,
+      });
+    }
+
+    mfCharts[canvasId] = new Chart(canvas, {
+      type: 'line',
+      data: { labels, datasets },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        interaction: { mode: 'index', intersect: false },
+        scales: {
+          x: {
+            ticks: {
+              color: '#5a5a52',
+              font: { family: 'IBM Plex Mono', size: 8 },
+              maxTicksLimit: 6,
+              // Show actual 0-100 values as labels
+              callback: (val, idx) => idx % 20 === 0 ? idx : '',
+            },
+            grid: { color: 'rgba(255,255,255,0.04)' },
+          },
+          y: {
+            min: 0, max: 1,
+            ticks: { color: '#5a5a52', font: { family: 'IBM Plex Mono', size: 8 }, stepSize: 0.5 },
+            grid: { color: 'rgba(255,255,255,0.04)' },
+          },
+        },
+        plugins: {
+          legend: { labels: { color: '#5a5a52', font: { family: 'IBM Plex Mono', size: 8 }, boxWidth: 10, padding: 8 } },
+          tooltip: { enabled: false },
+        },
+      }
     });
   }
 
-  _fzCharts[canvasId] = new Chart(ctx, {
-    type: 'line',
-    data: { labels: universe, datasets },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      animation: { duration: 600 },
-      plugins: { legend: { display: false } },
-      scales: {
-        x: { ticks: { color: '#5a5a52', maxTicksLimit: 6 }, grid: { color: 'rgba(255,255,255,0.04)' } },
-        y: { min: 0, max: 1.1, ticks: { color: '#5a5a52', maxTicksLimit: 4 }, grid: { color: 'rgba(255,255,255,0.04)' } },
-      },
-    },
-  });
+  drawMFChart('mf-income',   mf.main_fis.inputs.income_stability, ra.income_stability);
+  drawMFChart('mf-expense',  mf.main_fis.inputs.expense_level,    ra.expense_level);
+  drawMFChart('mf-savings',  mf.main_fis.inputs.savings_rate,     Math.max(0, ra.savings_rate));
+  drawMFChart('mf-risk-out', mf.main_fis.outputs.financial_risk,  ra.risk_score);
 }
 
-function renderAllMFCharts(mfData) {
-  const incV = parseInt(document.getElementById('fz-income')?.value ?? 50);
-  const expV = parseInt(document.getElementById('fz-expense')?.value ?? 50);
-  const savV = parseInt(document.getElementById('fz-savings')?.value ?? 50);
-  const debV = parseInt(document.getElementById('fz-debt')?.value ?? 50);
-
-  renderMFChart('mf-income',  'income_stability', incV, mfData, 'var(--acid)');
-  renderMFChart('mf-expense', 'expense_level',    expV, mfData, 'var(--ember)');
-  renderMFChart('mf-savings', 'savings_rate',     savV, mfData, 'var(--ice)');
-  renderMFChart('mf-debt',    'debt_pressure',    debV, mfData, '#b06fff');
-}
-
-// ── Risk panel ───────────────────────────────────────────────
-async function runFuzzyRisk() {
-  const inc = parseFloat(document.getElementById('fz-income')?.value ?? 50);
-  const exp = parseFloat(document.getElementById('fz-expense')?.value ?? 50);
-  const sav = parseFloat(document.getElementById('fz-savings')?.value ?? 50);
-  const dbt = parseFloat(document.getElementById('fz-debt')?.value ?? 50);
-
-  // Redraw MF charts with new input line
-  if (_fzMFData) renderAllMFCharts(_fzMFData);
-
-  const result = await fuzzyApi('/risk', 'POST', {
-    income_stability: inc, expense_level: exp, savings_rate: sav, debt_pressure: dbt
-  });
-
-  // Fallback demo
-  const risk = result?.financial_risk ?? (inc < 40 && dbt > 60 ? 78 : 42);
-  const rec  = result?.recommendation  ?? 45;
-  const rl   = result?.risk_label      ?? (risk > 65 ? 'high' : risk > 35 ? 'medium' : 'low');
-  const rcl  = result?.recommendation_label ?? 'save_more';
-
-  const riskColor = risk >= 65 ? 'var(--ember)' : risk >= 35 ? '#ffb800' : 'var(--acid)';
-
-  document.getElementById('fz-risk-score').textContent = risk.toFixed(1);
-  document.getElementById('fz-risk-score').style.color = riskColor;
-  document.getElementById('fz-risk-label').textContent = rl.replace(/_/g,' ');
-  document.getElementById('fz-risk-bar').style.width = risk + '%';
-  document.getElementById('fz-risk-bar').style.background = riskColor;
-
-  document.getElementById('fz-rec-score').textContent = rec.toFixed(1);
-  document.getElementById('fz-rec-label').textContent = rcl.replace(/_/g,' ');
-  document.getElementById('fz-rec-bar').style.width = rec + '%';
-}
-
-// ── Budget panel ─────────────────────────────────────────────
-async function loadFuzzyBudgets() {
-  const listEl = document.getElementById('fz-budget-list');
+// ─── FIS 2: Budget Fuzzy Warnings ────────────────────────────────────
+async function renderFuzzyBudgetPanel() {
+  const listEl = document.getElementById('fuzzy-budget-list');
   if (!listEl) return;
 
-  // Load budgets from existing backend
-  const rawBudgets = await api('/budgets');
-  const budgets = Array.isArray(rawBudgets)
-    ? rawBudgets
-    : rawBudgets?.content ?? rawBudgets?.budgets ?? null;
+  // Try to get budgets from backend
+  let budgets = [];
+  try {
+    const raw = await fetch(`${ML_BASE.replace(':8000', ':8080')}/budgets`, {
+      headers: { 'Authorization': `Bearer ${APP_STATE.token}` }
+    });
+    if (raw.ok) {
+      const data = await raw.json();
+      budgets = Array.isArray(data) ? data : (data.content ?? data.budgets ?? []);
+    }
+  } catch(e) {}
 
-  // Demo fallback
-  const items = (budgets && budgets.length > 0)
-    ? budgets.map(b => ({ name: b.name ?? b.category ?? 'Budget', spent: b.spent ?? b.usedAmount ?? 0, limit: b.limit ?? b.totalAmount ?? b.amount ?? 1 }))
-    : [
-        { name: 'Food & Dining', spent: 7800, limit: 10000 },
-        { name: 'Shopping',      spent: 9100, limit: 10000 },
-        { name: 'Transport',     spent: 2100, limit: 5000  },
-        { name: 'Entertainment', spent: 1450, limit: 5000  },
-      ];
+  if (!budgets.length) {
+    listEl.innerHTML = `<div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);text-align:center;padding:24px 0">No budgets configured yet. Add budgets in the Budgets tab to see fuzzy alerts.</div>`;
+    return;
+  }
 
-  const result = await fuzzyApi('/budget-alert', 'POST', { budgets: items });
-  const alerts = result?.alerts ?? items.map(it => {
-    const pct = Math.min((it.spent / it.limit) * 100, 100);
-    const level = pct >= 85 ? 'Critical' : pct >= 65 ? 'Warning' : pct >= 40 ? 'Caution' : 'Safe';
-    return { name: it.name, spent: it.spent, limit: it.limit, pct_used: pct.toFixed(1), alert_level: level, score: pct };
-  });
+  const now = new Date();
+  const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const daysLeft = lastDay - now.getDate();
 
-  listEl.innerHTML = alerts.map(a => {
-    const color = fzAlertColor(a.alert_level);
-    const pct   = parseFloat(a.pct_used ?? 0);
+  const results = await Promise.all(budgets.map(async b => {
+    const spent = b.spent ?? b.usedAmount ?? 0;
+    const limit = b.limit ?? b.totalAmount ?? b.amount ?? 1;
+    const utilPct = Math.min(100, (spent / limit) * 100);
+    try {
+      const res = await fetch(`${ML_BASE}/ml/fuzzy/budget-alert`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ budget_utilization_pct: utilPct, days_remaining: daysLeft })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        return { ...b, ...data, spent, limit, utilPct };
+      }
+    } catch(e) {}
+    return { ...b, alert_level: 'safe', alert_score: 0, spent, limit, utilPct, explanation: '' };
+  }));
+
+  const alertColors = { safe: 'var(--acid)', caution: 'var(--ice)', warning: '#ffb700', critical: 'var(--ember)' };
+  const alertIcons  = { safe: '✓', caution: '◎', warning: '⚠', critical: '✕' };
+
+  listEl.innerHTML = results.map(b => {
+    const color = alertColors[b.alert_level] || 'var(--muted)';
+    const icon  = alertIcons[b.alert_level]  || '?';
+    const score = b.alert_score != null ? b.alert_score.toFixed(1) : '—';
     return `
-      <div style="padding:16px 20px;border-left:3px solid ${color};background:rgba(255,255,255,0.025)">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-          <span style="font-family:var(--font-display);font-size:14px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:${color}">${a.name}</span>
-          <span style="display:flex;align-items:center;gap:12px">
-            <span style="font-family:var(--font-mono);font-size:9px;color:var(--muted)">₹${fmt(a.spent)} / ₹${fmt(a.limit)}</span>
-            <span style="font-family:var(--font-mono);font-size:9px;letter-spacing:0.1em;text-transform:uppercase;padding:3px 10px;border:1px solid ${color};color:${color}">${a.alert_level}</span>
-          </span>
+      <div class="alert-box" style="border-left-color:${color};margin-bottom:10px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <div>
+            <span style="font-family:var(--font-display);font-size:14px;font-weight:700;color:${color}">${icon} ${b.name ?? 'Budget'}</span>
+            <span style="font-family:var(--font-mono);font-size:9px;letter-spacing:0.12em;text-transform:uppercase;color:${color};margin-left:10px">${(b.alert_level||'').toUpperCase()}</span>
+          </div>
+          <div style="text-align:right">
+            <div style="font-family:var(--font-mono);font-size:9px;color:var(--muted)">Fuzzy Alert Score</div>
+            <div style="font-family:var(--font-display);font-size:20px;font-weight:900;color:${color}">${score}<span style="font-size:11px;color:var(--muted)">/100</span></div>
+          </div>
         </div>
-        <div style="height:3px;background:var(--dim)">
-          <div style="height:100%;width:${Math.min(pct,100)}%;background:${color};transition:width 1.2s cubic-bezier(0.22,1,0.36,1)"></div>
+        <div style="height:3px;background:#2a2a26;margin-bottom:8px"><div style="height:100%;width:${b.utilPct.toFixed(0)}%;background:${color};transition:width 0.4s"></div></div>
+        <div style="display:flex;justify-content:space-between">
+          <div style="font-family:var(--font-mono);font-size:8px;color:var(--muted)">₹${fmt(b.spent)} / ₹${fmt(b.limit)} · ${b.utilPct.toFixed(0)}% used · ${daysLeft}d left</div>
+          <div style="font-family:var(--font-mono);font-size:8px;color:var(--muted)">${b.explanation||''}</div>
         </div>
-        <div style="font-family:var(--font-mono);font-size:9px;color:var(--muted);margin-top:6px">${pct.toFixed(1)}% used</div>
       </div>`;
   }).join('');
 }
 
-// ── Savings advisor panel ────────────────────────────────────
-async function loadFuzzySavings() {
-  const rawAnalytics = await api('/analytics/dashboard');
-  const income   = rawAnalytics?.monthlyIncome   ?? rawAnalytics?.currentMonthIncome   ?? 142000;
-  const expenses = rawAnalytics?.monthlyExpenses ?? rawAnalytics?.currentMonthExpenses ?? 93500;
-  const savings  = income - expenses;
+// ─── FIS 3: Savings Goal Advisor ──────────────────────────────────────
+async function renderFuzzySavingsPanel() {
+  const el = document.getElementById('fuzzy-savings-content');
+  if (!el) return;
 
-  const result = await fuzzyApi('/savings-advisor', 'POST', {
-    monthly_income:   income,
-    monthly_expenses: expenses,
-    current_savings:  savings,
-    savings_goal:     null,
-  });
-
-  const strategy = result?.strategy ?? (savings/income > 0.3 ? 'Aggressive' : savings/income > 0.15 ? 'Moderate' : 'Conservative');
-  const range    = result?.target_range ?? [Math.round(savings * 1.1), Math.round(savings * 1.5)];
-  const advice   = result?.advice ?? 'Increase savings gradually — aim for 25%+ savings rate.';
-
-  const stratColor = strategy === 'Aggressive' ? 'var(--acid)' : strategy === 'Moderate' ? 'var(--ice)' : 'var(--ember)';
-
-  const stratEl = document.getElementById('fz-sav-strategy');
-  const rangeEl = document.getElementById('fz-sav-range');
-  const advEl   = document.getElementById('fz-sav-advice');
-  if (stratEl) { stratEl.textContent = strategy; stratEl.style.color = stratColor; }
-  if (rangeEl) rangeEl.textContent = `₹${fmt(range[0])} – ₹${fmt(range[1])}`;
-  if (advEl)   advEl.textContent   = advice;
-}
-
-// ── Anomaly severity table ───────────────────────────────────
-async function loadFuzzyAnomalies() {
-  const tbody = document.getElementById('fz-anomaly-body');
-  if (!tbody) return;
-
-  // Reuse existing transactions for scoring
-  const rawTx = await api('/transactions?limit=50&sort=date,desc');
-  const txArr = Array.isArray(rawTx) ? rawTx : rawTx?.content ?? rawTx?.transactions ?? [];
-
-  const txPayload = txArr.length > 0
-    ? txArr.slice(0, 30).map((tx, i) => ({ id: tx.id ?? i+1, description: tx.description ?? tx.merchant ?? 'Transaction', amount: Math.abs(tx.amount ?? 0) }))
-    : [
-        { id:1, description:'IndiGo Airlines', amount:8200 },
-        { id:2, description:'Salary', amount:142000 },
-        { id:3, description:'Netflix', amount:649 },
-        { id:4, description:'Swiggy', amount:480 },
-        { id:5, description:'Amazon', amount:12400 },
-      ];
-
-  const result = await fuzzyApi('/anomaly-severity', 'POST', { transactions: txPayload });
-  const rows   = Array.isArray(result) && result.length > 0 ? result : txPayload
-    .map((tx, i) => {
-      const mean = txPayload.reduce((s,t)=>s+t.amount,0)/txPayload.length;
-      const std  = Math.sqrt(txPayload.reduce((s,t)=>s+Math.pow(t.amount-mean,2),0)/txPayload.length) || 1;
-      const sev  = Math.min(Math.abs(tx.amount-mean)/std*25, 100);
-      return { transaction_id:tx.id, description:tx.description, amount:tx.amount, severity:parseFloat(sev.toFixed(1)), label: sev>=70?'Severe':sev>=40?'Moderate':'Mild' };
-    })
-    .sort((a,b)=>b.severity-a.severity)
-    .slice(0,10);
-
-  tbody.innerHTML = rows.map((r,i) => {
-    const color = fzSeverityColor(r.severity);
-    return `
-      <tr style="border-bottom:1px solid rgba(255,255,255,0.04)">
-        <td style="font-family:var(--font-mono);font-size:9px;color:var(--muted);padding:12px 0">${i+1}</td>
-        <td style="font-family:var(--font-body);font-size:13px;padding:12px 0">${r.description}</td>
-        <td style="font-family:var(--font-display);font-size:15px;font-weight:700;padding:12px 0;text-align:right">₹${fmt(r.amount)}</td>
-        <td style="font-family:var(--font-display);font-size:15px;font-weight:700;padding:12px 0;text-align:right;color:${color}">${r.severity}</td>
-        <td style="padding:12px 0;text-align:right">
-          <span style="font-family:var(--font-mono);font-size:9px;letter-spacing:0.1em;text-transform:uppercase;padding:3px 10px;border:1px solid ${color};color:${color}">${r.label}</span>
-        </td>
-      </tr>`;
-  }).join('');
-}
-
-// ── Main page loader ─────────────────────────────────────────
-async function loadFuzzyPage() {
-  if (DEBUG_API) console.log('[FUZZY] Loading Fuzzy AI page...');
-
-  // 1. Load / cache membership functions
-  if (!_fzMFData) {
-    const mfResult = await fuzzyApi('/membership-functions');
-    if (mfResult && mfResult.variables) {
-      _fzMFData = mfResult;
-    } else {
-      // Minimal offline fallback — approximate trimf locally
-      _fzMFData = buildLocalMFData();
-    }
+  const intel = dashAllData.intelligence;
+  const analytics = dashAllData.analytics || {};
+  if (!intel || !intel.risk_assessment) {
+    el.innerHTML = `<div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);padding:16px 0">Upload a PDF statement to enable savings advice.</div>`;
+    return;
   }
-  renderAllMFCharts(_fzMFData);
 
-  // 2. Run initial risk analysis
-  await runFuzzyRisk();
+  const ra = intel.risk_assessment;
+  const monthlyIncome = analytics.totalIncome || 0;
+  const expVol = _deriveExpenseVolatility(dashAllData.transactions);
 
-  // 3. Budget warnings
-  await loadFuzzyBudgets();
+  let advice = null;
+  try {
+    const res = await fetch(`${ML_BASE}/ml/fuzzy/savings-advisor`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        savings_rate: Math.max(0, ra.savings_rate),
+        expense_volatility_pct: expVol,
+        income_stability: ra.income_stability,
+        current_monthly_income: monthlyIncome,
+      })
+    });
+    if (res.ok) advice = await res.json();
+  } catch(e) { if (DEBUG_API) console.error('[FUZZY-SAVINGS]', e); }
 
-  // 4. Savings advisor
-  await loadFuzzySavings();
+  if (!advice) {
+    el.innerHTML = `<div style="font-family:var(--font-mono);font-size:10px;color:var(--muted)">Could not compute savings advice — ensure ML service is running.</div>`;
+    return;
+  }
 
-  // 5. Anomaly severity table
-  await loadFuzzyAnomalies();
+  const labelColors = { conservative: 'var(--muted)', moderate: 'var(--ice)', aggressive: 'var(--acid)', maximum: 'var(--acid)' };
+  const color = labelColors[advice.target_label] || 'var(--ice)';
 
-  if (DEBUG_API) console.log('[FUZZY] ✓ Fuzzy AI page ready');
+  el.innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:20px;margin-bottom:24px">
+      <div>
+        <div style="font-family:var(--font-mono);font-size:8px;letter-spacing:0.2em;color:var(--muted);text-transform:uppercase;margin-bottom:6px">Current Savings Rate</div>
+        <div style="font-family:var(--font-display);font-size:28px;font-weight:900;color:${advice.current_savings_rate > 30 ? 'var(--acid)' : 'var(--ember)'}">${advice.current_savings_rate.toFixed(1)}%</div>
+      </div>
+      <div>
+        <div style="font-family:var(--font-mono);font-size:8px;letter-spacing:0.2em;color:var(--muted);text-transform:uppercase;margin-bottom:6px">Fuzzy Target Strategy</div>
+        <div style="font-family:var(--font-display);font-size:28px;font-weight:900;color:${color};text-transform:uppercase">${advice.target_label}</div>
+      </div>
+      <div>
+        <div style="font-family:var(--font-mono);font-size:8px;letter-spacing:0.2em;color:var(--muted);text-transform:uppercase;margin-bottom:6px">Target % Band</div>
+        <div style="font-family:var(--font-display);font-size:28px;font-weight:900;color:${color}">${advice.target_pct_low}–${advice.target_pct_high}%</div>
+      </div>
+      <div>
+        <div style="font-family:var(--font-mono);font-size:8px;letter-spacing:0.2em;color:var(--muted);text-transform:uppercase;margin-bottom:6px">Target Monthly Amount</div>
+        <div style="font-family:var(--font-display);font-size:22px;font-weight:900;color:${color}">₹${fmt(advice.target_amt_low)} – ₹${fmt(advice.target_amt_high)}</div>
+      </div>
+    </div>
+    <div style="border-top:1px solid var(--line);padding-top:16px">
+      <div style="font-family:var(--font-mono);font-size:8px;letter-spacing:0.15em;color:var(--muted);text-transform:uppercase;margin-bottom:8px">FIS Advisory (3 inputs: savings_rate × volatility × income_stability)</div>
+      <div style="font-family:var(--font-mono);font-size:11px;color:var(--offwhite);line-height:1.7">${advice.advice}</div>
+      <div style="display:flex;gap:20px;margin-top:16px;flex-wrap:wrap">
+        <div style="font-family:var(--font-mono);font-size:8px;color:var(--muted)">Target Score: <span style="color:${color}">${advice.target_score.toFixed(1)}/100</span></div>
+        <div style="font-family:var(--font-mono);font-size:8px;color:var(--muted)">Expense Volatility: <span style="color:var(--offwhite)">${expVol.toFixed(1)}/100</span></div>
+        <div style="font-family:var(--font-mono);font-size:8px;color:var(--muted)">Income Stability: <span style="color:var(--offwhite)">${ra.income_stability.toFixed(1)}/100</span></div>
+      </div>
+    </div>`;
 }
 
-// ── Local MF fallback (when ML service is offline) ───────────
-function buildLocalMFData() {
-  const u = Array.from({length:101},(_,i)=>i);
-  function trimf(pts) {
-    const [a,b,c] = pts;
-    return u.map(x => {
-      if (x <= a || x >= c) return 0;
-      if (x <= b) return (x-a)/(b-a);
-      return (c-x)/(c-b);
+// ─── FIS 4: Anomaly Severity Scoring ────────────────────────────────
+async function renderFuzzyAnomalyPanel() {
+  const listEl = document.getElementById('fuzzy-anomaly-list');
+  if (!listEl) return;
+
+  const txns = dashAllData.transactions || [];
+  // ONLY score expense/debit transactions — income is never an anomaly
+  const debits = txns.filter(t => {
+    const type = (t.type || t.transaction_type || '').toUpperCase();
+    return type === 'EXPENSE' || type === 'DEBIT';
+  }).slice(0, 30);
+
+  if (!debits.length) {
+    listEl.innerHTML = `<div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);text-align:center;padding:16px 0">Upload transactions to see fuzzy anomaly severity scoring.</div>`;
+    return;
+  }
+
+  let results = [];
+  try {
+    const res = await fetch(`${ML_BASE}/ml/fuzzy/anomaly-severity`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        transactions: debits.map(t => ({
+          amount: Math.abs(t.amount || 0),
+          category: (t.category || '').toLowerCase()
+        }))
+      })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      results = (data.results || []).map((r, i) => ({ ...r, tx: debits[i] }));
+    }
+  } catch(e) { if (DEBUG_API) console.error('[FUZZY-ANOMALY]', e); }
+
+  if (!results.length) {
+    listEl.innerHTML = `<div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);text-align:center;padding:16px 0">Could not compute severity — ensure ML service is running.</div>`;
+    return;
+  }
+
+  // Sort by severity score desc, show top 10
+  const sorted = results.sort((a, b) => b.severity_score - a.severity_score).slice(0, 10);
+  const sevColors = { mild: 'var(--muted)', moderate: 'var(--ice)', severe: 'var(--ember)' };
+  const sevIcons  = { mild: '○', moderate: '◎', severe: '●' };
+
+  // Header
+  listEl.innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 80px 70px 70px 70px 90px;gap:8px;padding:0 0 10px;border-bottom:1px solid var(--line);font-family:var(--font-mono);font-size:8px;letter-spacing:0.2em;color:var(--muted);text-transform:uppercase">
+      <span>Merchant</span><span>Amount</span><span>Deviation</span><span>Cat Risk</span><span>Rarity</span><span>Severity</span>
+    </div>
+    ${sorted.map(r => {
+      const tx = r.tx || {};
+      const color = sevColors[r.severity_label] || 'var(--muted)';
+      const icon  = sevIcons[r.severity_label]  || '○';
+      return `<div style="display:grid;grid-template-columns:1fr 80px 70px 70px 70px 90px;gap:8px;padding:12px 0;border-bottom:1px solid var(--line);align-items:center">
+        <div>
+          <div style="font-family:var(--font-display);font-size:13px;font-weight:700;color:var(--offwhite)">${tx.merchant_person || 'Unknown'}</div>
+          <div style="font-family:var(--font-mono);font-size:8px;color:var(--muted)">${(tx.category || '—').toUpperCase()}</div>
+        </div>
+        <div style="font-family:var(--font-display);font-size:14px;font-weight:700;color:${color}">₹${fmt(Math.abs(tx.amount||0))}</div>
+        <div style="font-family:var(--font-mono);font-size:9px;color:var(--offwhite)">${r.amount_deviation_score != null ? r.amount_deviation_score.toFixed(0) : '—'}<span style="color:var(--muted)">/100</span></div>
+        <div style="font-family:var(--font-mono);font-size:9px;color:var(--offwhite)">${r.category_risk_score != null ? r.category_risk_score.toFixed(0) : '—'}<span style="color:var(--muted)">/100</span></div>
+        <div style="font-family:var(--font-mono);font-size:9px;color:var(--offwhite)">${r.rarity_score != null ? r.rarity_score.toFixed(0) : '—'}<span style="color:var(--muted)">/100</span></div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <span style="color:${color};font-size:14px">${icon}</span>
+          <div>
+            <div style="font-family:var(--font-display);font-size:12px;font-weight:900;color:${color};text-transform:uppercase">${r.severity_label || '—'}</div>
+            <div style="font-family:var(--font-mono);font-size:8px;color:var(--muted)">${r.severity_score != null ? r.severity_score.toFixed(1) : '—'}/100</div>
+          </div>
+        </div>
+      </div>`;
+    }).join('')}`;
+}
+
+// ─── Helper: expense volatility from transactions ────────────────────
+function _deriveExpenseVolatility(txns) {
+  const expenses = (txns || [])
+    .filter(t => (t.type||'').toUpperCase() === 'EXPENSE' || (t.transaction_type||'') === 'debit')
+    .map(t => Math.abs(t.amount || 0))
+    .filter(a => a > 0);
+  if (expenses.length < 2) return 30;
+  const mean = expenses.reduce((a, b) => a + b, 0) / expenses.length;
+  const std  = Math.sqrt(expenses.reduce((a, b) => a + (b - mean) ** 2, 0) / expenses.length);
+  return Math.min(100, (std / mean) * 100);
+}
+
+// ─── Hook into existing dashboard load ──────────────────────────────
+// Monkey-patch the existing updateDashboardUI to also call fuzzy
+const _origUpdateDashboardUI = typeof updateDashboardUI !== 'undefined' ? updateDashboardUI : null;
+// We can't reliably monkey-patch hoisted functions, so we call loadFuzzyInsights
+// via the existing loadDashboardPage override approach:
+(function patchDashboard() {
+  const origLoad = window.loadDashboardPage;
+  if (typeof origLoad === 'function') {
+    window.loadDashboardPage = async function() {
+      await origLoad.apply(this, arguments);
+      // Small delay to ensure dashAllData is populated
+      setTimeout(() => loadFuzzyInsights(), 300);
+    };
+  } else {
+    // Fallback: hook into DOMContentLoaded dashboard tab click
+    document.addEventListener('DOMContentLoaded', () => {
+      document.querySelectorAll('[data-page="dashboard"]').forEach(el => {
+        el.addEventListener('click', () => setTimeout(loadFuzzyInsights, 800));
+      });
     });
   }
-  return {
-    universe: u,
-    variables: {
-      income_stability: { low:trimf([0,0,45]),  medium:trimf([30,50,70]),  high:trimf([55,100,100]) },
-      expense_level:    { low:trimf([0,0,35]),  medium:trimf([25,50,75]),  high:trimf([60,100,100]) },
-      savings_rate:     { low:trimf([0,0,30]),  medium:trimf([20,45,70]),  high:trimf([55,100,100]) },
-      debt_pressure:    { low:trimf([0,0,30]),  medium:trimf([20,45,70]),  high:trimf([55,100,100]) },
-    }
-  };
-}
+})();
 </script>
 </body>
 </html>
