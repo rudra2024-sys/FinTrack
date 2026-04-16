@@ -1,12 +1,9 @@
 from __future__ import annotations
 
 from collections import Counter
-from typing import List, Optional
 
 import numpy as np
 from fastapi import FastAPI, File, Form, UploadFile
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
 from sklearn.ensemble import IsolationForest
 from sklearn.linear_model import LinearRegression
 
@@ -30,15 +27,6 @@ from .models import (
 from .pdf_parser import extract_google_pay_transactions
 
 app = FastAPI(title="FinTrack ML Service", version="0.2.0")
-
-# Add CORS middleware to allow requests from frontend
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins (for localhost development)
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 
 @app.get("/health")
@@ -155,7 +143,7 @@ async def pdf_intelligence(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# New Enhanced Fuzzy Logic Endpoints (4 FIS systems + visualization)
+# New Enhanced Fuzzy Logic Endpoints
 # ─────────────────────────────────────────────────────────────────────────────
 from pydantic import BaseModel
 from typing import List, Optional as Opt
@@ -177,7 +165,6 @@ class BudgetAlertRequest(BaseModel):
     budget_utilization_pct: float
     days_remaining: float
 
-
 @app.post("/ml/fuzzy/budget-alert")
 def fuzzy_budget_alert(req: BudgetAlertRequest):
     """Fuzzy budget warning: 2-input (utilization %, days remaining), 9 rules → Safe/Caution/Warning/Critical."""
@@ -190,7 +177,6 @@ class SavingsAdvisorRequest(BaseModel):
     income_stability: float
     current_monthly_income: float
 
-
 @app.post("/ml/fuzzy/savings-advisor")
 def fuzzy_savings_advisor(req: SavingsAdvisorRequest):
     """Fuzzy savings goal advisor: 3-input (rate, volatility, stability) → conservative/moderate/aggressive/maximum target."""
@@ -199,12 +185,10 @@ def fuzzy_savings_advisor(req: SavingsAdvisorRequest):
 
 class AnomalySeverityItem(BaseModel):
     amount: float
-    category: Optional[str] = None
-
+    category: Opt[str] = None
 
 class AnomalySeverityRequest(BaseModel):
     transactions: List[AnomalySeverityItem]
-
 
 @app.post("/ml/fuzzy/anomaly-severity")
 def fuzzy_anomaly_severity(req: AnomalySeverityRequest):

@@ -1209,7 +1209,7 @@ body:has(.clickable:hover) #cursor { width: 14px; height: 14px; }
             <div>
               <div style="font-family:var(--font-mono);font-size:8px;letter-spacing:0.2em;color:var(--muted);text-transform:uppercase;margin-bottom:6px">Income Stability</div>
               <div style="font-family:var(--font-display);font-size:26px;font-weight:900;color:var(--acid)" id="fz-income-val">—</div>
-              <div style="font-family:var(--font-mono);font-size:8px;color:var(--muted)">/ 100</div>
+              <div style="font-family:var(--font-mono);font-size:8px;color:var(--muted)" id="fz-income-lbl">/ 100</div>
             </div>
             <div>
               <div style="font-family:var(--font-mono);font-size:8px;letter-spacing:0.2em;color:var(--muted);text-transform:uppercase;margin-bottom:6px">Expense Level</div>
@@ -1223,7 +1223,7 @@ body:has(.clickable:hover) #cursor { width: 14px; height: 14px; }
             </div>
             <div>
               <div style="font-family:var(--font-mono);font-size:8px;letter-spacing:0.2em;color:var(--muted);text-transform:uppercase;margin-bottom:6px">Risk Score</div>
-              <div style="font-family:var(--font-display);font-size:26px;font-weight:900" id="fz-risk-val">—</div>
+              <div style="font-family:var(--font-display);font-size:26px;font-weight:900" id="fz-risk-val" style="color:var(--ice)">—</div>
               <div style="font-family:var(--font-mono);font-size:8px;color:var(--muted)" id="fz-risk-lbl">/ 100</div>
             </div>
           </div>
@@ -2425,6 +2425,366 @@ document.addEventListener('keydown', (e) => {
     // Could add more shortcuts here
   }
 });
+
+// ═══════════════════════════════════════════════════════════════════
+// FUZZY LOGIC ENGINE — UI INTEGRATION
+// All 4 FIS systems: Risk, Budget, Savings, Anomaly Severity
+// Hooks into existing loadDashboardPage flow — no existing code changed
+// ═══════════════════════════════════════════════════════════════════
+
+const ML_BASE = 'http://localhost:8000';
+const fuzzyState = { mfData: null, budgetAlerts: [], savingsAdvice: null, anomalySeverities: [] };
+const mfCharts = {};
+
+// ─── Main entry: called after dashboard data loads ──────────────────
+async function loadFuzzyInsights() {
+  try {
+    // Load MF data (cached)
+    if (!fuzzyState.mfData) {
+      const res = await fetch(`${ML_BASE}/ml/fuzzy/membership-functions`);
+      if (res.ok) fuzzyState.mfData = await res.json();
+    }
+    await Promise.all([
+      renderFuzzyRiskPanel(),
+      renderFuzzyBudgetPanel(),
+      renderFuzzySavingsPanel(),
+      renderFuzzyAnomalyPanel(),
+    ]);
+  } catch(e) {
+    if (DEBUG_API) console.error('[FUZZY] Error loading fuzzy insights:', e);
+  }
+}
+
+// ─── FIS 1: Risk + MF Visualization ─────────────────────────────────
+async function renderFuzzyRiskPanel() {
+  const intel = dashAllData.intelligence;
+  if (!intel || !intel.risk_assessment) return;
+  const ra = intel.risk_assessment;
+
+  // Update numeric displays
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  set('fz-income-val', ra.income_stability != null ? ra.income_stability.toFixed(1) : '—');
+  set('fz-expense-val', ra.expense_level != null ? ra.expense_level.toFixed(1) : '—');
+  set('fz-savings-val', ra.savings_rate != null ? ra.savings_rate.toFixed(1) : '—');
+  set('fz-risk-val', ra.risk_score != null ? ra.risk_score.toFixed(1) : '—');
+
+  const riskEl = document.getElementById('fz-risk-val');
+  if (riskEl) {
+    const score = ra.risk_score || 0;
+    riskEl.style.color = score > 65 ? 'var(--ember)' : score > 33 ? 'var(--ice)' : 'var(--acid)';
+  }
+
+  const labelEl = document.getElementById('fz-risk-label');
+  if (labelEl) {
+    const risk = (ra.financial_risk || 'unknown').toUpperCase();
+    labelEl.textContent = risk;
+    labelEl.style.color = risk === 'HIGH' ? 'var(--ember)' : risk === 'MEDIUM' ? 'var(--ice)' : 'var(--acid)';
+  }
+
+  const recEl = document.getElementById('fz-recommendation');
+  if (recEl) recEl.textContent = (ra.recommendation || '—').replace(/_/g, ' ').toUpperCase();
+
+  // Draw MF charts
+  if (!fuzzyState.mfData) return;
+  const mf = fuzzyState.mfData;
+  const x = mf.universe;
+  const mfColors = { low: '#c8f000', medium: '#00e5ff', high: '#ff4d00', safe_to_invest: '#c8f000', save_more: '#00e5ff', reduce_spending: '#ffb700', emergency_alert: '#ff4d00' };
+
+  function drawMFChart(canvasId, varData, currentVal) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas || !varData || !Chart) return;
+    if (mfCharts[canvasId]) mfCharts[canvasId].destroy();
+    const datasets = Object.entries(varData)
+      .filter(([k]) => k !== 'label')
+      .map(([name, yVals]) => ({
+        label: name.replace(/_/g, ' '),
+        data: x.map((xi, i) => ({ x: xi, y: yVals[i] })),
+        borderColor: mfColors[name] || '#5a5a52',
+        backgroundColor: (mfColors[name] || '#5a5a52') + '18',
+        borderWidth: 1.5,
+        fill: true,
+        pointRadius: 0,
+        tension: 0,
+      }));
+
+    // Vertical line at current value
+    if (currentVal != null && !isNaN(currentVal)) {
+      datasets.push({
+        label: `Current: ${currentVal.toFixed(1)}`,
+        data: [{ x: currentVal, y: 0 }, { x: currentVal, y: 1 }],
+        borderColor: '#ffffff',
+        borderWidth: 1,
+        borderDash: [4, 4],
+        pointRadius: 0,
+        fill: false,
+        tension: 0,
+      });
+    }
+
+    mfCharts[canvasId] = new Chart(canvas, {
+      type: 'line',
+      data: { datasets },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        parsing: false,
+        animation: false,
+        scales: {
+          x: { type: 'linear', min: 0, max: 100, ticks: { color: '#5a5a52', font: { family: 'IBM Plex Mono', size: 8 }, maxTicksLimit: 6 }, grid: { color: 'rgba(255,255,255,0.04)' } },
+          y: { min: 0, max: 1, ticks: { color: '#5a5a52', font: { family: 'IBM Plex Mono', size: 8 }, stepSize: 0.5 }, grid: { color: 'rgba(255,255,255,0.04)' } },
+        },
+        plugins: { legend: { labels: { color: '#5a5a52', font: { family: 'IBM Plex Mono', size: 8 }, boxWidth: 10 } } },
+      }
+    });
+  }
+
+  drawMFChart('mf-income',   mf.main_fis.inputs.income_stability, ra.income_stability);
+  drawMFChart('mf-expense',  mf.main_fis.inputs.expense_level,    ra.expense_level);
+  drawMFChart('mf-savings',  mf.main_fis.inputs.savings_rate,     Math.max(0, ra.savings_rate));
+  drawMFChart('mf-risk-out', mf.main_fis.outputs.financial_risk,  ra.risk_score);
+}
+
+// ─── FIS 2: Budget Fuzzy Warnings ────────────────────────────────────
+async function renderFuzzyBudgetPanel() {
+  const listEl = document.getElementById('fuzzy-budget-list');
+  if (!listEl) return;
+
+  // Try to get budgets from backend
+  let budgets = [];
+  try {
+    const raw = await fetch(`${ML_BASE.replace(':8000', ':8080')}/budgets`, {
+      headers: { 'Authorization': `Bearer ${APP_STATE.token}` }
+    });
+    if (raw.ok) {
+      const data = await raw.json();
+      budgets = Array.isArray(data) ? data : (data.content ?? data.budgets ?? []);
+    }
+  } catch(e) {}
+
+  if (!budgets.length) {
+    listEl.innerHTML = `<div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);text-align:center;padding:24px 0">No budgets configured yet. Add budgets in the Budgets tab to see fuzzy alerts.</div>`;
+    return;
+  }
+
+  const now = new Date();
+  const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const daysLeft = lastDay - now.getDate();
+
+  const results = await Promise.all(budgets.map(async b => {
+    const spent = b.spent ?? b.usedAmount ?? 0;
+    const limit = b.limit ?? b.totalAmount ?? b.amount ?? 1;
+    const utilPct = Math.min(100, (spent / limit) * 100);
+    try {
+      const res = await fetch(`${ML_BASE}/ml/fuzzy/budget-alert`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ budget_utilization_pct: utilPct, days_remaining: daysLeft })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        return { ...b, ...data, spent, limit, utilPct };
+      }
+    } catch(e) {}
+    return { ...b, alert_level: 'safe', alert_score: 0, spent, limit, utilPct, explanation: '' };
+  }));
+
+  const alertColors = { safe: 'var(--acid)', caution: 'var(--ice)', warning: '#ffb700', critical: 'var(--ember)' };
+  const alertIcons  = { safe: '✓', caution: '◎', warning: '⚠', critical: '✕' };
+
+  listEl.innerHTML = results.map(b => {
+    const color = alertColors[b.alert_level] || 'var(--muted)';
+    const icon  = alertIcons[b.alert_level]  || '?';
+    const score = b.alert_score != null ? b.alert_score.toFixed(1) : '—';
+    return `
+      <div class="alert-box" style="border-left-color:${color};margin-bottom:10px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <div>
+            <span style="font-family:var(--font-display);font-size:14px;font-weight:700;color:${color}">${icon} ${b.name ?? 'Budget'}</span>
+            <span style="font-family:var(--font-mono);font-size:9px;letter-spacing:0.12em;text-transform:uppercase;color:${color};margin-left:10px">${(b.alert_level||'').toUpperCase()}</span>
+          </div>
+          <div style="text-align:right">
+            <div style="font-family:var(--font-mono);font-size:9px;color:var(--muted)">Fuzzy Alert Score</div>
+            <div style="font-family:var(--font-display);font-size:20px;font-weight:900;color:${color}">${score}<span style="font-size:11px;color:var(--muted)">/100</span></div>
+          </div>
+        </div>
+        <div style="height:3px;background:#2a2a26;margin-bottom:8px"><div style="height:100%;width:${b.utilPct.toFixed(0)}%;background:${color};transition:width 0.4s"></div></div>
+        <div style="display:flex;justify-content:space-between">
+          <div style="font-family:var(--font-mono);font-size:8px;color:var(--muted)">₹${fmt(b.spent)} / ₹${fmt(b.limit)} · ${b.utilPct.toFixed(0)}% used · ${daysLeft}d left</div>
+          <div style="font-family:var(--font-mono);font-size:8px;color:var(--muted)">${b.explanation||''}</div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+// ─── FIS 3: Savings Goal Advisor ──────────────────────────────────────
+async function renderFuzzySavingsPanel() {
+  const el = document.getElementById('fuzzy-savings-content');
+  if (!el) return;
+
+  const intel = dashAllData.intelligence;
+  const analytics = dashAllData.analytics || {};
+  if (!intel || !intel.risk_assessment) {
+    el.innerHTML = `<div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);padding:16px 0">Upload a PDF statement to enable savings advice.</div>`;
+    return;
+  }
+
+  const ra = intel.risk_assessment;
+  const monthlyIncome = analytics.totalIncome || 0;
+  const expVol = _deriveExpenseVolatility(dashAllData.transactions);
+
+  let advice = null;
+  try {
+    const res = await fetch(`${ML_BASE}/ml/fuzzy/savings-advisor`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        savings_rate: Math.max(0, ra.savings_rate),
+        expense_volatility_pct: expVol,
+        income_stability: ra.income_stability,
+        current_monthly_income: monthlyIncome,
+      })
+    });
+    if (res.ok) advice = await res.json();
+  } catch(e) { if (DEBUG_API) console.error('[FUZZY-SAVINGS]', e); }
+
+  if (!advice) {
+    el.innerHTML = `<div style="font-family:var(--font-mono);font-size:10px;color:var(--muted)">Could not compute savings advice — ensure ML service is running.</div>`;
+    return;
+  }
+
+  const labelColors = { conservative: 'var(--muted)', moderate: 'var(--ice)', aggressive: 'var(--acid)', maximum: 'var(--acid)' };
+  const color = labelColors[advice.target_label] || 'var(--ice)';
+
+  el.innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:20px;margin-bottom:24px">
+      <div>
+        <div style="font-family:var(--font-mono);font-size:8px;letter-spacing:0.2em;color:var(--muted);text-transform:uppercase;margin-bottom:6px">Current Savings Rate</div>
+        <div style="font-family:var(--font-display);font-size:28px;font-weight:900;color:${advice.current_savings_rate > 30 ? 'var(--acid)' : 'var(--ember)'}">${advice.current_savings_rate.toFixed(1)}%</div>
+      </div>
+      <div>
+        <div style="font-family:var(--font-mono);font-size:8px;letter-spacing:0.2em;color:var(--muted);text-transform:uppercase;margin-bottom:6px">Fuzzy Target Strategy</div>
+        <div style="font-family:var(--font-display);font-size:28px;font-weight:900;color:${color};text-transform:uppercase">${advice.target_label}</div>
+      </div>
+      <div>
+        <div style="font-family:var(--font-mono);font-size:8px;letter-spacing:0.2em;color:var(--muted);text-transform:uppercase;margin-bottom:6px">Target % Band</div>
+        <div style="font-family:var(--font-display);font-size:28px;font-weight:900;color:${color}">${advice.target_pct_low}–${advice.target_pct_high}%</div>
+      </div>
+      <div>
+        <div style="font-family:var(--font-mono);font-size:8px;letter-spacing:0.2em;color:var(--muted);text-transform:uppercase;margin-bottom:6px">Target Monthly Amount</div>
+        <div style="font-family:var(--font-display);font-size:22px;font-weight:900;color:${color}">₹${fmt(advice.target_amt_low)} – ₹${fmt(advice.target_amt_high)}</div>
+      </div>
+    </div>
+    <div style="border-top:1px solid var(--line);padding-top:16px">
+      <div style="font-family:var(--font-mono);font-size:8px;letter-spacing:0.15em;color:var(--muted);text-transform:uppercase;margin-bottom:8px">FIS Advisory (3 inputs: savings_rate × volatility × income_stability)</div>
+      <div style="font-family:var(--font-mono);font-size:11px;color:var(--offwhite);line-height:1.7">${advice.advice}</div>
+      <div style="display:flex;gap:20px;margin-top:16px;flex-wrap:wrap">
+        <div style="font-family:var(--font-mono);font-size:8px;color:var(--muted)">Target Score: <span style="color:${color}">${advice.target_score.toFixed(1)}/100</span></div>
+        <div style="font-family:var(--font-mono);font-size:8px;color:var(--muted)">Expense Volatility: <span style="color:var(--offwhite)">${expVol.toFixed(1)}/100</span></div>
+        <div style="font-family:var(--font-mono);font-size:8px;color:var(--muted)">Income Stability: <span style="color:var(--offwhite)">${ra.income_stability.toFixed(1)}/100</span></div>
+      </div>
+    </div>`;
+}
+
+// ─── FIS 4: Anomaly Severity Scoring ────────────────────────────────
+async function renderFuzzyAnomalyPanel() {
+  const listEl = document.getElementById('fuzzy-anomaly-list');
+  if (!listEl) return;
+
+  const txns = dashAllData.transactions || [];
+  const debits = txns.filter(t => (t.type || '').toUpperCase() === 'EXPENSE' || (t.transaction_type || '') === 'debit').slice(0, 30);
+
+  if (!debits.length) {
+    listEl.innerHTML = `<div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);text-align:center;padding:16px 0">Upload transactions to see fuzzy anomaly severity scoring.</div>`;
+    return;
+  }
+
+  let results = [];
+  try {
+    const res = await fetch(`${ML_BASE}/ml/fuzzy/anomaly-severity`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        transactions: debits.map(t => ({
+          amount: Math.abs(t.amount || 0),
+          category: (t.category || '').toLowerCase()
+        }))
+      })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      results = (data.results || []).map((r, i) => ({ ...r, tx: debits[i] }));
+    }
+  } catch(e) { if (DEBUG_API) console.error('[FUZZY-ANOMALY]', e); }
+
+  if (!results.length) {
+    listEl.innerHTML = `<div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);text-align:center;padding:16px 0">Could not compute severity — ensure ML service is running.</div>`;
+    return;
+  }
+
+  // Sort by severity score desc, show top 10
+  const sorted = results.sort((a, b) => b.severity_score - a.severity_score).slice(0, 10);
+  const sevColors = { mild: 'var(--muted)', moderate: 'var(--ice)', severe: 'var(--ember)' };
+  const sevIcons  = { mild: '○', moderate: '◎', severe: '●' };
+
+  // Header
+  listEl.innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 80px 70px 70px 70px 90px;gap:8px;padding:0 0 10px;border-bottom:1px solid var(--line);font-family:var(--font-mono);font-size:8px;letter-spacing:0.2em;color:var(--muted);text-transform:uppercase">
+      <span>Merchant</span><span>Amount</span><span>Deviation</span><span>Cat Risk</span><span>Rarity</span><span>Severity</span>
+    </div>
+    ${sorted.map(r => {
+      const tx = r.tx || {};
+      const color = sevColors[r.severity_label] || 'var(--muted)';
+      const icon  = sevIcons[r.severity_label]  || '○';
+      return `<div style="display:grid;grid-template-columns:1fr 80px 70px 70px 70px 90px;gap:8px;padding:12px 0;border-bottom:1px solid var(--line);align-items:center">
+        <div>
+          <div style="font-family:var(--font-display);font-size:13px;font-weight:700;color:var(--offwhite)">${tx.merchant_person || 'Unknown'}</div>
+          <div style="font-family:var(--font-mono);font-size:8px;color:var(--muted)">${(tx.category || '—').toUpperCase()}</div>
+        </div>
+        <div style="font-family:var(--font-display);font-size:14px;font-weight:700;color:${color}">₹${fmt(Math.abs(tx.amount||0))}</div>
+        <div style="font-family:var(--font-mono);font-size:9px;color:var(--offwhite)">${r.amount_deviation_score != null ? r.amount_deviation_score.toFixed(0) : '—'}<span style="color:var(--muted)">/100</span></div>
+        <div style="font-family:var(--font-mono);font-size:9px;color:var(--offwhite)">${r.category_risk_score != null ? r.category_risk_score.toFixed(0) : '—'}<span style="color:var(--muted)">/100</span></div>
+        <div style="font-family:var(--font-mono);font-size:9px;color:var(--offwhite)">${r.rarity_score != null ? r.rarity_score.toFixed(0) : '—'}<span style="color:var(--muted)">/100</span></div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <span style="color:${color};font-size:14px">${icon}</span>
+          <div>
+            <div style="font-family:var(--font-display);font-size:12px;font-weight:900;color:${color};text-transform:uppercase">${r.severity_label || '—'}</div>
+            <div style="font-family:var(--font-mono);font-size:8px;color:var(--muted)">${r.severity_score != null ? r.severity_score.toFixed(1) : '—'}/100</div>
+          </div>
+        </div>
+      </div>`;
+    }).join('')}`;
+}
+
+// ─── Helper: expense volatility from transactions ────────────────────
+function _deriveExpenseVolatility(txns) {
+  const expenses = (txns || [])
+    .filter(t => (t.type||'').toUpperCase() === 'EXPENSE' || (t.transaction_type||'') === 'debit')
+    .map(t => Math.abs(t.amount || 0))
+    .filter(a => a > 0);
+  if (expenses.length < 2) return 30;
+  const mean = expenses.reduce((a, b) => a + b, 0) / expenses.length;
+  const std  = Math.sqrt(expenses.reduce((a, b) => a + (b - mean) ** 2, 0) / expenses.length);
+  return Math.min(100, (std / mean) * 100);
+}
+
+// ─── Hook into existing dashboard load ──────────────────────────────
+// Monkey-patch the existing updateDashboardUI to also call fuzzy
+const _origUpdateDashboardUI = typeof updateDashboardUI !== 'undefined' ? updateDashboardUI : null;
+// We can't reliably monkey-patch hoisted functions, so we call loadFuzzyInsights
+// via the existing loadDashboardPage override approach:
+(function patchDashboard() {
+  const origLoad = window.loadDashboardPage;
+  if (typeof origLoad === 'function') {
+    window.loadDashboardPage = async function() {
+      await origLoad.apply(this, arguments);
+      // Small delay to ensure dashAllData is populated
+      setTimeout(() => loadFuzzyInsights(), 300);
+    };
+  } else {
+    // Fallback: hook into DOMContentLoaded dashboard tab click
+    document.addEventListener('DOMContentLoaded', () => {
+      document.querySelectorAll('[data-page="dashboard"]').forEach(el => {
+        el.addEventListener('click', () => setTimeout(loadFuzzyInsights, 800));
+      });
+    });
+  }
+})();
 </script>
 </body>
 </html>

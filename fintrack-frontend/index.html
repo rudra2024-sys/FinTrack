@@ -1001,6 +1001,110 @@ body:has(.clickable:hover) #cursor { width: 14px; height: 14px; }
         </div>
       </div>
 
+      <!-- ══════════════════════════════════════════════════════════ -->
+      <!-- FUZZY LOGIC ENGINE — 4 FIS PANELS (additive, no UI change) -->
+      <!-- ══════════════════════════════════════════════════════════ -->
+
+      <!-- FUZZY RISK PANEL: Multi-variable FIS + MF Visualization -->
+      <div class="reveal" style="margin-top:24px" id="fuzzy-risk-section">
+        <div class="panel-card">
+          <div class="panel-eyebrow">Fuzzy Logic — Financial Risk FIS</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:20px;margin-bottom:24px" id="fuzzy-risk-inputs">
+            <div>
+              <div style="font-family:var(--font-mono);font-size:8px;letter-spacing:0.2em;color:var(--muted);text-transform:uppercase;margin-bottom:6px">Income Stability</div>
+              <div style="font-family:var(--font-display);font-size:26px;font-weight:900;color:var(--acid)" id="fz-income-val">—</div>
+              <div style="font-family:var(--font-mono);font-size:8px;color:var(--muted)">/ 100</div>
+            </div>
+            <div>
+              <div style="font-family:var(--font-mono);font-size:8px;letter-spacing:0.2em;color:var(--muted);text-transform:uppercase;margin-bottom:6px">Expense Level</div>
+              <div style="font-family:var(--font-display);font-size:26px;font-weight:900;color:var(--ember)" id="fz-expense-val">—</div>
+              <div style="font-family:var(--font-mono);font-size:8px;color:var(--muted)">% of income</div>
+            </div>
+            <div>
+              <div style="font-family:var(--font-mono);font-size:8px;letter-spacing:0.2em;color:var(--muted);text-transform:uppercase;margin-bottom:6px">Savings Rate</div>
+              <div style="font-family:var(--font-display);font-size:26px;font-weight:900;color:var(--acid)" id="fz-savings-val">—</div>
+              <div style="font-family:var(--font-mono);font-size:8px;color:var(--muted)">%</div>
+            </div>
+            <div>
+              <div style="font-family:var(--font-mono);font-size:8px;letter-spacing:0.2em;color:var(--muted);text-transform:uppercase;margin-bottom:6px">Risk Score</div>
+              <div style="font-family:var(--font-display);font-size:26px;font-weight:900" id="fz-risk-val">—</div>
+              <div style="font-family:var(--font-mono);font-size:8px;color:var(--muted)" id="fz-risk-lbl">/ 100</div>
+            </div>
+          </div>
+
+          <!-- Rule firing summary -->
+          <div style="border-top:1px solid var(--line);padding-top:16px;margin-bottom:20px">
+            <div style="font-family:var(--font-mono);font-size:8px;letter-spacing:0.15em;color:var(--muted);text-transform:uppercase;margin-bottom:10px">18-Rule Mamdani FIS Output</div>
+            <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+              <div style="display:flex;align-items:center;gap:8px">
+                <div style="font-family:var(--font-mono);font-size:9px;color:var(--muted)">Risk Label:</div>
+                <div style="font-family:var(--font-display);font-size:14px;font-weight:900;letter-spacing:0.1em;text-transform:uppercase" id="fz-risk-label">—</div>
+              </div>
+              <div style="width:1px;height:20px;background:var(--line)"></div>
+              <div style="display:flex;align-items:center;gap:8px">
+                <div style="font-family:var(--font-mono);font-size:9px;color:var(--muted)">Recommendation:</div>
+                <div style="font-family:var(--font-display);font-size:14px;font-weight:900;letter-spacing:0.1em;text-transform:uppercase;color:var(--ice)" id="fz-recommendation">—</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Membership Function Visualization -->
+          <div style="border-top:1px solid var(--line);padding-top:16px">
+            <div style="font-family:var(--font-mono);font-size:8px;letter-spacing:0.15em;color:var(--muted);text-transform:uppercase;margin-bottom:16px">Membership Functions — Input Variables</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+              <div>
+                <div style="font-family:var(--font-mono);font-size:8px;color:var(--muted);margin-bottom:8px">Income Stability MF</div>
+                <canvas id="mf-income" height="100"></canvas>
+              </div>
+              <div>
+                <div style="font-family:var(--font-mono);font-size:8px;color:var(--muted);margin-bottom:8px">Expense Level MF</div>
+                <canvas id="mf-expense" height="100"></canvas>
+              </div>
+              <div>
+                <div style="font-family:var(--font-mono);font-size:8px;color:var(--muted);margin-bottom:8px">Savings Rate MF</div>
+                <canvas id="mf-savings" height="100"></canvas>
+              </div>
+              <div>
+                <div style="font-family:var(--font-mono);font-size:8px;color:var(--muted);margin-bottom:8px">Financial Risk Output MF</div>
+                <canvas id="mf-risk-out" height="100"></canvas>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- FUZZY BUDGET WARNINGS PANEL -->
+      <div class="reveal" style="margin-top:24px" id="fuzzy-budget-section">
+        <div class="panel-card">
+          <div class="panel-eyebrow">Fuzzy Logic — Budget Warning System</div>
+          <div style="font-family:var(--font-mono);font-size:9px;color:var(--muted);margin-bottom:20px">2-input FIS (utilization × days remaining) → Safe / Caution / Warning / Critical — 9 rules, centroid defuzzification</div>
+          <div id="fuzzy-budget-list">
+            <div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);text-align:center;padding:24px 0">No budgets configured yet. Add budgets in the Budgets tab to see fuzzy alerts.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- FUZZY SAVINGS ADVISOR PANEL -->
+      <div class="reveal" style="margin-top:24px" id="fuzzy-savings-section">
+        <div class="panel-card">
+          <div class="panel-eyebrow">Fuzzy Logic — Savings Goal Advisor</div>
+          <div id="fuzzy-savings-content">
+            <div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);text-align:center;padding:24px 0">Loading savings analysis…</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- FUZZY ANOMALY SEVERITY PANEL -->
+      <div class="reveal" style="margin-top:24px" id="fuzzy-anomaly-section">
+        <div class="panel-card">
+          <div class="panel-eyebrow">Fuzzy Logic — Anomaly Severity Scoring</div>
+          <div style="font-family:var(--font-mono);font-size:9px;color:var(--muted);margin-bottom:20px">3-input FIS (amount deviation × category risk × rarity) → Mild / Moderate / Severe — 15 rules replacing binary detection</div>
+          <div id="fuzzy-anomaly-list">
+            <div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);text-align:center;padding:24px 0">Loading anomaly severity analysis…</div>
+          </div>
+        </div>
+      </div>
+
       <!-- TRANSACTION TABLE -->
       <div class="reveal" style="margin-top:24px">
         <div class="panel-card">

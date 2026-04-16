@@ -1,185 +1,42 @@
+"""
+Enhanced Fuzzy Logic Engine for FinTrack
+=========================================
+4 FIS systems:
+1. Main Financial Risk Assessment (4 inputs, 18 rules, Mamdani + centroid)
+2. Budget Fuzzy Warning System (2 inputs, 9 rules)
+3. Savings Goal Fuzzy Advisor (3 inputs, 12 rules)
+4. Anomaly Severity Scoring (3 inputs, 15 rules)
+"""
 from __future__ import annotations
 
+import math
 import statistics
+from typing import Optional
+
 import numpy as np
 import skfuzzy as fuzz
 from skfuzzy import control as ctrl
 
 from .models import AlertItem, RiskAssessment, TrendPoint
 
-
-RECOMMENDATION_SCALE = {
-    20: "safe_to_invest",
-    45: "save_more",
-    65: "reduce_spending",
-    90: "emergency_alert",
-}
-
-
-def assess_financial_risk(
-    daily_trends: list[TrendPoint],
-    income_stability: float | None,
-    savings_rate: float | None,
-    debt_pressure: float | None,
-) -> tuple[RiskAssessment, list[str], list[AlertItem]]:
-    computed_income_stability = income_stability if income_stability is not None else _derive_income_stability(daily_trends)
-    computed_expense_level = _derive_expense_level(daily_trends)
-    computed_savings_rate = savings_rate if savings_rate is not None else _derive_savings_rate(daily_trends)
-    computed_debt_pressure = debt_pressure if debt_pressure is not None else _derive_debt_pressure(daily_trends)
-
-    simulation = _build_simulation()
-    simulation.input["income_stability"] = computed_income_stability
-    simulation.input["expense_level"] = computed_expense_level
-    simulation.input["savings_rate"] = max(0.0, min(100.0, computed_savings_rate))
-    simulation.input["debt_pressure"] = computed_debt_pressure
-    simulation.compute()
-
-    risk_score = float(simulation.output["financial_risk"])
-    recommendation_score = float(simulation.output["recommendation"])
-    risk_label = _risk_label(risk_score)
-    recommendation = _recommendation_label(recommendation_score)
-
-    insights = [
-        f"Fuzzy risk engine classifies the current profile as '{risk_label}' with a score of {risk_score:.1f}/100.",
-        f"Primary recommendation is '{recommendation}'.",
-    ]
-    alerts: list[AlertItem] = []
-    if risk_label == "high":
-        alerts.append(AlertItem(
-            level="high",
-            title="High financial risk",
-            detail="Income stability, expense pressure, savings, and debt indicators point to a high-risk profile.",
-        ))
-
-    return (
-        RiskAssessment(
-            income_stability=round(computed_income_stability, 2),
-            expense_level=round(computed_expense_level, 2),
-            savings_rate=round(computed_savings_rate, 2),
-            debt_pressure=round(computed_debt_pressure, 2),
-            financial_risk=risk_label,
-            risk_score=round(risk_score, 2),
-            recommendation=recommendation,
-        ),
-        insights,
-        alerts,
-    )
-
-
-def _build_simulation() -> ctrl.ControlSystemSimulation:
-    universe = np.arange(0, 101, 1)
-
-    income = ctrl.Antecedent(universe, "income_stability")
-    expense = ctrl.Antecedent(universe, "expense_level")
-    savings = ctrl.Antecedent(universe, "savings_rate")
-    debt = ctrl.Antecedent(universe, "debt_pressure")
-    risk = ctrl.Consequent(universe, "financial_risk")
-    recommendation = ctrl.Consequent(universe, "recommendation")
-
-    income["low"] = fuzz.trimf(universe, [0, 0, 45])
-    income["medium"] = fuzz.trimf(universe, [30, 50, 70])
-    income["high"] = fuzz.trimf(universe, [55, 100, 100])
-
-    expense["low"] = fuzz.trimf(universe, [0, 0, 35])
-    expense["medium"] = fuzz.trimf(universe, [25, 50, 75])
-    expense["high"] = fuzz.trimf(universe, [60, 100, 100])
-
-    savings["low"] = fuzz.trimf(universe, [0, 0, 30])
-    savings["medium"] = fuzz.trimf(universe, [20, 45, 70])
-    savings["high"] = fuzz.trimf(universe, [55, 100, 100])
-
-    debt["low"] = fuzz.trimf(universe, [0, 0, 30])
-    debt["medium"] = fuzz.trimf(universe, [20, 45, 70])
-    debt["high"] = fuzz.trimf(universe, [55, 100, 100])
-
-    risk["low"] = fuzz.trimf(universe, [0, 0, 40])
-    risk["medium"] = fuzz.trimf(universe, [25, 50, 75])
-    risk["high"] = fuzz.trimf(universe, [60, 100, 100])
-
-    recommendation["safe_to_invest"] = fuzz.trimf(universe, [0, 15, 30])
-    recommendation["save_more"] = fuzz.trimf(universe, [25, 40, 55])
-    recommendation["reduce_spending"] = fuzz.trimf(universe, [50, 65, 80])
-    recommendation["emergency_alert"] = fuzz.trimf(universe, [75, 90, 100])
-
-    rules = [
-        ctrl.Rule(income["high"] & expense["low"] & savings["high"] & debt["low"], (risk["low"], recommendation["safe_to_invest"])),
-        ctrl.Rule(expense["medium"] & savings["medium"], (risk["medium"], recommendation["save_more"])),
-        ctrl.Rule(expense["high"] | debt["high"], (risk["high"], recommendation["reduce_spending"])),
-        ctrl.Rule(income["low"] & debt["high"], (risk["high"], recommendation["emergency_alert"])),
-        ctrl.Rule(savings["low"] & expense["high"], (risk["high"], recommendation["reduce_spending"])),
-        ctrl.Rule(income["medium"] & debt["medium"] & expense["medium"], (risk["medium"], recommendation["save_more"])),
-    ]
-
-    system = ctrl.ControlSystem(rules)
-    return ctrl.ControlSystemSimulation(system)
-
-
-def _derive_income_stability(daily_trends: list[TrendPoint]) -> float:
-    incomes = [point.income for point in daily_trends if point.income > 0]
-    if len(incomes) < 2:
-        return 50.0
-    avg = float(np.mean(incomes))
-    std = float(np.std(incomes))
-    cv = std / avg if avg else 1.0
-    return max(0.0, min(100.0, 100 - (cv * 100)))
-
-
-def _derive_expense_level(daily_trends: list[TrendPoint]) -> float:
-    income = sum(point.income for point in daily_trends)
-    expense = sum(point.expense for point in daily_trends)
-    if income <= 0:
-        return 75.0 if expense > 0 else 0.0
-    return max(0.0, min(100.0, (expense / income) * 100))
-
-
-def _derive_savings_rate(daily_trends: list[TrendPoint]) -> float:
-    income = sum(point.income for point in daily_trends)
-    expense = sum(point.expense for point in daily_trends)
-    if income <= 0:
-        return 0.0
-    return ((income - expense) / income) * 100
-
-
-def _derive_debt_pressure(daily_trends: list[TrendPoint]) -> float:
-    negative_days = sum(1 for point in daily_trends if point.net < 0)
-    total_days = len(daily_trends) or 1
-    return (negative_days / total_days) * 100
-
-
-def _risk_label(score: float) -> str:
-    if score < 35:
-        return "low"
-    if score < 65:
-        return "medium"
-    return "high"
-
-
-def _recommendation_label(score: float) -> str:
-    closest = min(RECOMMENDATION_SCALE, key=lambda key: abs(key - score))
-    return RECOMMENDATION_SCALE[closest]
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# NEW FIS SYSTEMS - Budget, Savings, Anomaly & Visualization
-# ─────────────────────────────────────────────────────────────────────────────
-
 UNIVERSE = np.arange(0, 101, 1)
-BUDGET_ALERT_SCALE = {12: "safe", 35: "caution", 60: "warning", 85: "critical"}
+
+RECOMMENDATION_SCALE = {12: "safe_to_invest", 35: "save_more", 60: "reduce_spending", 85: "emergency_alert"}
+BUDGET_ALERT_SCALE   = {12: "safe", 35: "caution", 60: "warning", 85: "critical"}
 ANOMALY_SEVERITY_SCALE = {15: "mild", 45: "moderate", 80: "severe"}
 
-
-def _mf_data(u, arr):
-    """Convert numpy array to list of rounded floats for JSON serialization."""
-    return [round(float(v), 4) for v in arr]
-
-
 def _nearest_label(score, scale):
-    """Find nearest label key in scale based on score."""
     return scale[min(scale, key=lambda k: abs(k - score))]
 
+def _risk_label(score):
+    if score < 33: return "low"
+    if score < 66: return "medium"
+    return "high"
+
+def _mf_data(u, arr):
+    return [round(float(v), 4) for v in arr]
 
 def get_membership_function_data():
-    """Returns all fuzzy membership function data for all 4 FIS systems (for UI visualization)."""
     u = UNIVERSE
     x = u.tolist()
     return {
@@ -317,7 +174,6 @@ def get_membership_function_data():
 
 
 def _safe_run(sim, inputs, output_key):
-    """Safely run a simulation with clamped inputs and error handling."""
     try:
         for k, v in inputs.items():
             sim.input[k] = max(0.0, min(100.0, float(v)))
@@ -327,8 +183,46 @@ def _safe_run(sim, inputs, output_key):
         return 50.0
 
 
+def _build_main_fis():
+    u = UNIVERSE
+    income  = ctrl.Antecedent(u, "income_stability")
+    expense = ctrl.Antecedent(u, "expense_level")
+    savings = ctrl.Antecedent(u, "savings_rate")
+    debt    = ctrl.Antecedent(u, "debt_pressure")
+    risk    = ctrl.Consequent(u, "financial_risk")
+    rec     = ctrl.Consequent(u, "recommendation")
+
+    income["low"]    = fuzz.trapmf(u, [0,0,25,45]);  income["medium"] = fuzz.trimf(u, [30,50,70]);  income["high"]   = fuzz.trapmf(u, [55,75,100,100])
+    expense["low"]   = fuzz.trapmf(u, [0,0,20,40]);  expense["medium"]= fuzz.trimf(u, [25,50,75]);  expense["high"]  = fuzz.trapmf(u, [60,80,100,100])
+    savings["low"]   = fuzz.trapmf(u, [0,0,15,30]);  savings["medium"]= fuzz.trimf(u, [20,40,60]);  savings["high"]  = fuzz.trapmf(u, [50,70,100,100])
+    debt["low"]      = fuzz.trapmf(u, [0,0,20,35]);  debt["medium"]   = fuzz.trimf(u, [25,50,75]);  debt["high"]     = fuzz.trapmf(u, [60,75,100,100])
+    risk["low"]      = fuzz.trapmf(u, [0,0,25,40]);  risk["medium"]   = fuzz.trimf(u, [25,50,75]);  risk["high"]     = fuzz.trapmf(u, [60,75,100,100])
+    rec["safe_to_invest"] = fuzz.trapmf(u, [0,0,10,25]); rec["save_more"] = fuzz.trimf(u, [20,35,50]); rec["reduce_spending"] = fuzz.trimf(u, [45,60,75]); rec["emergency_alert"] = fuzz.trapmf(u, [70,85,100,100])
+
+    rules = [
+        ctrl.Rule(income["high"] & expense["low"] & savings["high"] & debt["low"],   (risk["low"],    rec["safe_to_invest"])),
+        ctrl.Rule(income["high"] & expense["low"] & savings["medium"] & debt["low"], (risk["low"],    rec["save_more"])),
+        ctrl.Rule(income["high"] & expense["medium"] & savings["medium"] & debt["low"], (risk["medium"], rec["save_more"])),
+        ctrl.Rule(income["medium"] & expense["low"] & savings["medium"] & debt["low"], (risk["low"],   rec["save_more"])),
+        ctrl.Rule(income["medium"] & expense["medium"] & savings["medium"] & debt["medium"], (risk["medium"], rec["save_more"])),
+        ctrl.Rule(income["medium"] & expense["high"] & savings["low"],               (risk["high"],   rec["reduce_spending"])),
+        ctrl.Rule(debt["high"] & income["low"],                                       (risk["high"],   rec["emergency_alert"])),
+        ctrl.Rule(debt["high"] & expense["high"],                                     (risk["high"],   rec["reduce_spending"])),
+        ctrl.Rule(savings["low"] & expense["high"],                                   (risk["high"],   rec["reduce_spending"])),
+        ctrl.Rule(income["low"] & debt["medium"],                                     (risk["high"],   rec["emergency_alert"])),
+        ctrl.Rule(income["high"] & expense["high"] & savings["medium"] & debt["low"],(risk["medium"], rec["reduce_spending"])),
+        ctrl.Rule(savings["low"] & expense["medium"],                                 (risk["medium"], rec["reduce_spending"])),
+        ctrl.Rule(income["high"] & debt["low"] & savings["low"],                     (risk["low"],    rec["save_more"])),
+        ctrl.Rule(income["low"] & expense["medium"] & debt["medium"],                (risk["high"],   rec["reduce_spending"])),
+        ctrl.Rule(income["medium"] & expense["medium"] & savings["low"] & debt["medium"], (risk["medium"], rec["reduce_spending"])),
+        ctrl.Rule(income["low"] & expense["low"] & debt["low"],                      (risk["medium"], rec["save_more"])),
+        ctrl.Rule(savings["high"] & debt["low"],                                      (risk["low"],    rec["safe_to_invest"])),
+        ctrl.Rule(income["low"] & expense["high"] & savings["low"] & debt["high"],   (risk["high"],   rec["emergency_alert"])),
+    ]
+    return ctrl.ControlSystemSimulation(ctrl.ControlSystem(rules))
+
+
 def _build_budget_fis():
-    """FIS 2: Budget Fuzzy Warning (2 inputs, 9 rules, 4 alert levels)."""
     u = UNIVERSE
     util    = ctrl.Antecedent(u, "budget_utilization")
     days    = ctrl.Antecedent(u, "days_remaining")
@@ -353,7 +247,6 @@ def _build_budget_fis():
 
 
 def _build_savings_fis():
-    """FIS 3: Savings Goal Advisor (3 inputs, 12 rules, 4 target strategies)."""
     u = UNIVERSE
     sav  = ctrl.Antecedent(u, "savings_rate")
     vol  = ctrl.Antecedent(u, "expense_volatility")
@@ -383,7 +276,6 @@ def _build_savings_fis():
 
 
 def _build_anomaly_fis():
-    """FIS 4: Anomaly Severity Scoring (3 inputs, 15 rules, 3 severity levels)."""
     u = UNIVERSE
     dev  = ctrl.Antecedent(u, "amount_deviation")
     cat  = ctrl.Antecedent(u, "category_risk")
@@ -418,13 +310,51 @@ def _build_anomaly_fis():
 CATEGORY_RISK_WEIGHTS = {"bills":30,"food":35,"transport":30,"health":40,"shopping":55,"entertainment":60,"personal":50,"others":65,"refund":10}
 
 def _category_risk_score(category):
-    """Return risk weight for a transaction category."""
     if not category: return 50.0
     return float(CATEGORY_RISK_WEIGHTS.get(category.lower(), 55))
 
 
+def assess_financial_risk(daily_trends, income_stability, savings_rate, debt_pressure):
+    computed_income_stability = income_stability if income_stability is not None else _derive_income_stability(daily_trends)
+    computed_expense_level    = _derive_expense_level(daily_trends)
+    computed_savings_rate     = savings_rate if savings_rate is not None else _derive_savings_rate(daily_trends)
+    computed_debt_pressure    = debt_pressure if debt_pressure is not None else _derive_debt_pressure(daily_trends)
+
+    inputs = {"income_stability": computed_income_stability, "expense_level": computed_expense_level, "savings_rate": max(0.0, computed_savings_rate), "debt_pressure": computed_debt_pressure}
+    risk_score = _safe_run(_build_main_fis(), inputs, "financial_risk")
+    rec_score  = _safe_run(_build_main_fis(), inputs, "recommendation")
+
+    risk_label     = _risk_label(risk_score)
+    recommendation = _nearest_label(rec_score, RECOMMENDATION_SCALE)
+
+    insights = [
+        f"Mamdani FIS (18 rules, 4 inputs) classifies profile as '{risk_label}' — risk score {risk_score:.1f}/100.",
+        f"Centroid defuzzification recommends: '{recommendation}'.",
+        f"Income stability: {computed_income_stability:.1f}/100 | Expense level: {computed_expense_level:.1f}/100.",
+        f"Savings rate: {computed_savings_rate:.1f}% | Debt pressure: {computed_debt_pressure:.1f}/100.",
+    ]
+    alerts = []
+    if risk_label == "high":
+        alerts.append(AlertItem(level="high", title="High Financial Risk Detected", detail=f"Fuzzy risk_score={risk_score:.0f}/100. Action: {recommendation}."))
+    elif risk_label == "medium":
+        alerts.append(AlertItem(level="medium", title="Moderate Financial Risk", detail=f"Risk score {risk_score:.0f}/100. Consider: {recommendation}."))
+
+    return (
+        RiskAssessment(
+            income_stability=round(computed_income_stability, 2),
+            expense_level=round(computed_expense_level, 2),
+            savings_rate=round(computed_savings_rate, 2),
+            debt_pressure=round(computed_debt_pressure, 2),
+            financial_risk=risk_label,
+            risk_score=round(risk_score, 2),
+            recommendation=recommendation,
+        ),
+        insights,
+        alerts,
+    )
+
+
 def assess_budget_alert(budget_utilization_pct, days_remaining):
-    """Fuzzy budget warning: 2-input FIS, 9 rules → Safe/Caution/Warning/Critical."""
     days_mapped  = min(100.0, (days_remaining / 31.0) * 100.0)
     alert_score  = _safe_run(_build_budget_fis(), {"budget_utilization": budget_utilization_pct, "days_remaining": days_mapped}, "alert_level")
     label = _nearest_label(alert_score, BUDGET_ALERT_SCALE)
@@ -438,7 +368,6 @@ def assess_budget_alert(budget_utilization_pct, days_remaining):
 
 
 def advise_savings_goal(savings_rate, expense_volatility_pct, income_stability, current_monthly_income):
-    """Fuzzy savings goal advisor: 3-input FIS, 12 rules → conservative/moderate/aggressive/maximum."""
     target_score = _safe_run(_build_savings_fis(), {"savings_rate": max(0.0, savings_rate), "expense_volatility": expense_volatility_pct, "income_stability": income_stability}, "savings_target")
     label_map = {12: "conservative", 38: "moderate", 68: "aggressive", 90: "maximum"}
     label = _nearest_label(target_score, label_map)
@@ -459,7 +388,6 @@ def advise_savings_goal(savings_rate, expense_volatility_pct, income_stability, 
 
 
 def score_anomaly_severity(amount, category, mean_amount, std_amount, category_frequency, total_transactions):
-    """Fuzzy anomaly severity: 3-input FIS, 15 rules → Mild/Moderate/Severe per transaction."""
     z_score = abs((amount - mean_amount) / std_amount) if std_amount > 0 else (5.0 if amount > mean_amount * 2 else 0.0)
     amount_deviation = min(100.0, (z_score / 5.0) * 100.0)
     cat_risk = _category_risk_score(category)
@@ -471,10 +399,32 @@ def score_anomaly_severity(amount, category, mean_amount, std_amount, category_f
     return {"severity_label": label, "severity_score": round(severity_score, 2), "amount_deviation_score": round(amount_deviation, 2), "category_risk_score": round(cat_risk, 2), "rarity_score": round(rarity, 2), "z_score": round(z_score, 2), "explanation": expl[label]}
 
 
+def _derive_income_stability(daily_trends):
+    incomes = [p.income for p in daily_trends if p.income > 0]
+    if len(incomes) < 2: return 50.0
+    avg = float(np.mean(incomes)); std = float(np.std(incomes))
+    cv = std / avg if avg else 1.0
+    return max(0.0, min(100.0, 100 - (cv * 100)))
+
+def _derive_expense_level(daily_trends):
+    income = sum(p.income for p in daily_trends); expense = sum(p.expense for p in daily_trends)
+    if income <= 0: return 75.0 if expense > 0 else 0.0
+    return max(0.0, min(100.0, (expense / income) * 100))
+
+def _derive_savings_rate(daily_trends):
+    income = sum(p.income for p in daily_trends); expense = sum(p.expense for p in daily_trends)
+    if income <= 0: return 0.0
+    return ((income - expense) / income) * 100
+
+def _derive_debt_pressure(daily_trends):
+    neg = sum(1 for p in daily_trends if p.net < 0)
+    return (neg / (len(daily_trends) or 1)) * 100
+
 def _derive_expense_volatility(daily_trends):
-    """Calculate expense volatility (coefficient of variation)."""
     expenses = [p.expense for p in daily_trends if p.expense > 0]
     if len(expenses) < 2: return 30.0
     try:
         return max(0.0, min(100.0, statistics.stdev(expenses) / statistics.mean(expenses) * 100))
     except Exception: return 30.0
+
+import statistics
