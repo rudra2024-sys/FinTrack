@@ -75,6 +75,7 @@ com\fintrack\controller\SavingsGoalController.class
 com\fintrack\dto\auth\AuthDTOs$RegisterRequest.class
 com\fintrack\controller\AuthController.class
 com\fintrack\dto\budget\BudgetDTOs$CreateRequest.class
+com\fintrack\dto\MonthlySummaryItem.class
 com\fintrack\dto\analytics\AnalyticsDTOs$SpendingStateSummary.class
 com\fintrack\dto\intelligence\IntelligenceDTOs.class
 com\fintrack\dto\insights\InsightDTOs$RecommendationItem.class

@@ -105,26 +105,37 @@ public class AnalyticsService {
     public List<MonthlyData> getMonthlyTrend(Long userId, LocalDate referenceDate) {
         LocalDate endMonth = referenceDate.withDayOfMonth(1);
         LocalDate startDate = endMonth.minusMonths(11);
-        List<Object[]> rows = transactionRepository.getMonthlySummary(userId, startDate);
-
+        
+        // Production-safe: Get raw data from DB, group in Java (DB-agnostic)
+        List<Object[]> rawData = transactionRepository.getMonthlySummaryData(userId, startDate);
+        
         Map<String, BigDecimal[]> monthMap = new LinkedHashMap<>();
         DateTimeFormatter fmt = DateTimeFormatter.ofPattern("yyyy-MM");
-
+        
+        // Initialize 12 months with zeros
         for (int i = 0; i < 12; i++) {
             LocalDate month = startDate.plusMonths(i);
             monthMap.put(month.format(fmt), new BigDecimal[]{BigDecimal.ZERO, BigDecimal.ZERO});
         }
-
-        for (Object[] row : rows) {
-            String month = row[0].toString().substring(0, 7);
-            String type = row[1].toString();
-            BigDecimal total = (BigDecimal) row[2];
-
-            monthMap.computeIfAbsent(month, k -> new BigDecimal[]{BigDecimal.ZERO, BigDecimal.ZERO});
-            if ("INCOME".equals(type))  monthMap.get(month)[0] = total;
-            if ("EXPENSE".equals(type)) monthMap.get(month)[1] = total;
+        
+        // Process raw data: each row is [LocalDate, TransactionType, BigDecimal]
+        for (Object[] row : rawData) {
+            LocalDate transactionDate = (LocalDate) row[0];
+            TransactionType type = (TransactionType) row[1];
+            BigDecimal amount = (BigDecimal) row[2];
+            
+            String monthKey = transactionDate.format(fmt);
+            monthMap.computeIfAbsent(monthKey, k -> new BigDecimal[]{BigDecimal.ZERO, BigDecimal.ZERO});
+            
+            BigDecimal[] totals = monthMap.get(monthKey);
+            if (type == TransactionType.INCOME) {
+                totals[0] = totals[0].add(amount);
+            } else if (type == TransactionType.EXPENSE) {
+                totals[1] = totals[1].add(amount);
+            }
         }
-
+        
+        // Convert to response format
         return monthMap.entrySet().stream()
                 .map(e -> new MonthlyData(
                         e.getKey(),

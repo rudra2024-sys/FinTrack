@@ -57,6 +57,7 @@ C:\Fintrack\fintrack-backend\src\main\java\com\fintrack\repository\UserRepositor
 C:\Fintrack\fintrack-backend\src\main\java\com\fintrack\service\RecurringTransactionService.java
 C:\Fintrack\fintrack-backend\src\main\java\com\fintrack\dto\insights\InsightDTOs.java
 C:\Fintrack\fintrack-backend\src\main\java\com\fintrack\exception\GlobalExceptionHandler.java
+C:\Fintrack\fintrack-backend\src\main\java\com\fintrack\dto\MonthlySummaryItem.java
 C:\Fintrack\fintrack-backend\src\main\java\com\fintrack\repository\RecurringTransactionRepository.java
 C:\Fintrack\fintrack-backend\src\main\java\com\fintrack\repository\SavingsGoalRepository.java
 C:\Fintrack\fintrack-backend\src\main\java\com\fintrack\service\AnalyticsService.java

@@ -67,19 +67,16 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
             @Param("endDate") LocalDate endDate
     );
 
-    // Monthly summary for charts - H2 compatible using DATEADD and DAYOFMONTH
-    @Query(value = """
-        SELECT
-            DATEADD('DAY', -DAYOFMONTH(transaction_date) + 1, transaction_date) AS month,
-            type,
-            SUM(amount) AS total
-        FROM transactions
-        WHERE user_id = :userId
-          AND transaction_date >= :startDate
-        GROUP BY DATEADD('DAY', -DAYOFMONTH(transaction_date) + 1, transaction_date), type
-        ORDER BY month
-        """, nativeQuery = true)
-    List<Object[]> getMonthlySummary(
+    // Monthly summary for charts - Production-safe: Get raw data, group in Java
+    // This approach is database-agnostic and fully testable
+    @Query("""
+        SELECT t.transactionDate, t.type, t.amount
+        FROM Transaction t
+        WHERE t.user.id = :userId
+          AND t.transactionDate >= :startDate
+        ORDER BY t.transactionDate ASC
+        """)
+    List<Object[]> getMonthlySummaryData(
             @Param("userId") Long userId,
             @Param("startDate") LocalDate startDate
     );

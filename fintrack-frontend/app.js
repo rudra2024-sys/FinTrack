@@ -1061,24 +1061,70 @@ function renderAnalyticsPage() {
 function renderGoalCreatePanel() {
   const defaultAccountId = APP_STATE.accounts[0]?.id || "";
   return `
-    <div class="full-panel" style="margin-top:0;margin-bottom:18px">
-      <div class="panel-eyebrow">Goal Planner</div>
-      <div class="panel-title" style="margin-bottom:18px">Create Savings Goal</div>
-      <div style="display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr auto;gap:12px;align-items:end">
-        <div><div style="font-family:var(--font-mono);font-size:8px;color:var(--muted);text-transform:uppercase;margin-bottom:6px">Goal Name</div><input id="goal-name-input" class="ft-input" type="text" placeholder="Emergency Fund" style="width:100%"></div>
-        <div><div style="font-family:var(--font-mono);font-size:8px;color:var(--muted);text-transform:uppercase;margin-bottom:6px">Target Amount</div><input id="goal-target-input" class="ft-input" type="number" placeholder="50000" style="width:100%"></div>
-        <div><div style="font-family:var(--font-mono);font-size:8px;color:var(--muted);text-transform:uppercase;margin-bottom:6px">Monthly Add</div><input id="goal-monthly-input" class="ft-input" type="number" placeholder="5000" style="width:100%"></div>
-        <div><div style="font-family:var(--font-mono);font-size:8px;color:var(--muted);text-transform:uppercase;margin-bottom:6px">Target Date</div><input id="goal-date-input" class="ft-input" type="date" style="width:100%"></div>
-        <div>
-          <input id="goal-account-input" type="hidden" value="${escapeHtml(defaultAccountId)}">
-          <button id="goal-create-btn" class="pg-btn" type="button">CREATE GOAL</button>
+    <div class="full-panel" style="margin-top:0;margin-bottom:28px;padding:40px;background:linear-gradient(135deg, rgba(200,240,0,0.04) 0%, rgba(200,240,0,0.02) 100%);border:1px solid rgba(200,240,0,0.1)">
+      <div class="panel-eyebrow" style="margin-bottom:16px">Goal Planner</div>
+      <div class="panel-title" style="margin-bottom:32px;font-size:28px">Create Savings Goal</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:24px">
+        <div style="padding:20px;background:rgba(255,255,255,0.02);border:1px solid var(--line2);border-radius:8px">
+          <div style="font-family:var(--font-mono);font-size:12px;color:var(--acid);text-transform:uppercase;margin-bottom:12px;font-weight:700;letter-spacing:0.1em">Goal Name</div>
+          <input id="goal-name-input" class="ft-input" type="text" placeholder="Emergency Fund" style="width:100%;padding:16px;font-size:18px;background:rgba(0,0,0,0.3);border:1px solid var(--line2);border-radius:6px;color:var(--offwhite);font-family:var(--font-display)">
+        </div>
+        <div style="padding:20px;background:rgba(255,255,255,0.02);border:1px solid var(--line2);border-radius:8px">
+          <div style="font-family:var(--font-mono);font-size:12px;color:var(--acid);text-transform:uppercase;margin-bottom:12px;font-weight:700;letter-spacing:0.1em">Target Amount (₹)</div>
+          <input id="goal-target-input" class="ft-input" type="number" placeholder="50,000" style="width:100%;padding:16px;font-size:18px;background:rgba(0,0,0,0.3);border:1px solid var(--line2);border-radius:6px;color:var(--offwhite);font-family:var(--font-display)">
+        </div>
+        <div style="padding:20px;background:rgba(255,255,255,0.02);border:1px solid var(--line2);border-radius:8px">
+          <div style="font-family:var(--font-mono);font-size:12px;color:var(--acid);text-transform:uppercase;margin-bottom:12px;font-weight:700;letter-spacing:0.1em">Monthly Contribution (₹)</div>
+          <input id="goal-monthly-input" class="ft-input" type="number" placeholder="5,000" style="width:100%;padding:16px;font-size:18px;background:rgba(0,0,0,0.3);border:1px solid var(--line2);border-radius:6px;color:var(--offwhite);font-family:var(--font-display)">
+        </div>
+        <div style="padding:20px;background:rgba(255,255,255,0.02);border:1px solid var(--line2);border-radius:8px">
+          <div style="font-family:var(--font-mono);font-size:12px;color:var(--acid);text-transform:uppercase;margin-bottom:12px;font-weight:700;letter-spacing:0.1em">Target Date</div>
+          <input id="goal-date-input" class="ft-input" type="date" style="width:100%;padding:16px;font-size:18px;background:rgba(0,0,0,0.3);border:1px solid var(--line2);border-radius:6px;color:var(--offwhite);font-family:var(--font-display)">
         </div>
       </div>
+      <div>
+        <input id="goal-account-input" type="hidden" value="${escapeHtml(defaultAccountId)}">
+        <button id="goal-create-btn" class="pg-btn" type="button" style="width:100%;padding:18px;font-size:16px;font-weight:700;letter-spacing:0.1em;background:var(--acid);color:var(--dark);border-radius:8px;border:none;cursor:pointer;transition:all 0.2s">CREATE GOAL</button>
+      </div>
+      <div id="goal-success-feedback" style="margin-top:16px;padding:14px;background:rgba(200,240,0,0.15);border:1px solid var(--acid);border-radius:6px;color:var(--acid);font-size:14px;display:none;text-align:center;font-weight:600">✓ Goal created successfully!</div>
+    </div>`;
+}
+
+function renderBudgetCreatePanel() {
+  const defaultAccountId = APP_STATE.accounts[0]?.id || "";
+  return `
+    <div class="full-panel" style="margin-top:0;margin-bottom:28px;padding:40px;background:linear-gradient(135deg, rgba(255,107,107,0.04) 0%, rgba(255,107,107,0.02) 100%);border:1px solid rgba(255,107,107,0.1)">
+      <div class="panel-eyebrow" style="margin-bottom:16px">Budget Planner</div>
+      <div class="panel-title" style="margin-bottom:32px;font-size:28px">Create Spending Budget</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:24px">
+        <div style="padding:20px;background:rgba(255,255,255,0.02);border:1px solid var(--line2);border-radius:8px">
+          <div style="font-family:var(--font-mono);font-size:12px;color:var(--ember);text-transform:uppercase;margin-bottom:12px;font-weight:700;letter-spacing:0.1em">Budget Category</div>
+          <input id="budget-name-input" class="ft-input" type="text" placeholder="Groceries" style="width:100%;padding:16px;font-size:18px;background:rgba(0,0,0,0.3);border:1px solid var(--line2);border-radius:6px;color:var(--offwhite);font-family:var(--font-display)">
+        </div>
+        <div style="padding:20px;background:rgba(255,255,255,0.02);border:1px solid var(--line2);border-radius:8px">
+          <div style="font-family:var(--font-mono);font-size:12px;color:var(--ember);text-transform:uppercase;margin-bottom:12px;font-weight:700;letter-spacing:0.1em">Monthly Limit (₹)</div>
+          <input id="budget-limit-input" class="ft-input" type="number" placeholder="10,000" style="width:100%;padding:16px;font-size:18px;background:rgba(0,0,0,0.3);border:1px solid var(--line2);border-radius:6px;color:var(--offwhite);font-family:var(--font-display)">
+        </div>
+        <div style="padding:20px;background:rgba(255,255,255,0.02);border:1px solid var(--line2);border-radius:8px">
+          <div style="font-family:var(--font-mono);font-size:12px;color:var(--ember);text-transform:uppercase;margin-bottom:12px;font-weight:700;letter-spacing:0.1em">Alert Threshold (%)</div>
+          <input id="budget-alert-input" class="ft-input" type="number" placeholder="80" min="0" max="100" style="width:100%;padding:16px;font-size:18px;background:rgba(0,0,0,0.3);border:1px solid var(--line2);border-radius:6px;color:var(--offwhite);font-family:var(--font-display)">
+        </div>
+        <div style="padding:20px;background:rgba(255,255,255,0.02);border:1px solid var(--line2);border-radius:8px">
+          <div style="font-family:var(--font-mono);font-size:12px;color:var(--ember);text-transform:uppercase;margin-bottom:12px;font-weight:700;letter-spacing:0.1em">Start Date</div>
+          <input id="budget-date-input" class="ft-input" type="date" style="width:100%;padding:16px;font-size:18px;background:rgba(0,0,0,0.3);border:1px solid var(--line2);border-radius:6px;color:var(--offwhite);font-family:var(--font-display)">
+        </div>
+      </div>
+      <div>
+        <input id="budget-account-input" type="hidden" value="${escapeHtml(defaultAccountId)}">
+        <button id="budget-create-btn" class="pg-btn" type="button" style="width:100%;padding:18px;font-size:16px;font-weight:700;letter-spacing:0.1em;background:var(--ember);color:var(--offwhite);border-radius:8px;border:none;cursor:pointer;transition:all 0.2s">CREATE BUDGET</button>
+      </div>
+      <div id="budget-success-feedback" style="margin-top:16px;padding:14px;background:rgba(255,107,107,0.15);border:1px solid var(--ember);border-radius:6px;color:var(--ember);font-size:14px;display:none;text-align:center;font-weight:600">✓ Budget created successfully!</div>
     </div>`;
 }
 
 function bindGoalsControls() {
   document.getElementById("goal-create-btn")?.addEventListener("click", createGoal);
+  document.getElementById("budget-create-btn")?.addEventListener("click", createBudget);
   document.querySelectorAll("[data-goal-contribute]").forEach((button) => {
     button.addEventListener("click", async () => {
       await contributeToGoal(button.dataset.goalContribute);
@@ -1121,7 +1167,7 @@ function renderGoalsPage() {
     }).join("")
     : '<div class="full-panel" style="margin-top:0"><div class="page-loading">No savings goals yet. Create one above to start tracking progress.</div></div>';
 
-  container.innerHTML = `${renderGoalCreatePanel()}${goalsMarkup}`;
+  container.innerHTML = `${renderGoalCreatePanel()}${renderBudgetCreatePanel()}${goalsMarkup}`;
   bindGoalsControls();
 }
 
@@ -1362,8 +1408,77 @@ async function createGoal() {
   }
 
   showToast("Goal created successfully.", "success");
+  
+  // Show success feedback
+  const feedback = document.getElementById("goal-success-feedback");
+  if (feedback) {
+    feedback.style.display = "block";
+    setTimeout(() => {
+      feedback.style.display = "none";
+    }, 3000);
+  }
+  
+  // Clear form
+  document.getElementById("goal-name-input").value = "";
+  document.getElementById("goal-target-input").value = "";
+  document.getElementById("goal-monthly-input").value = "";
+  document.getElementById("goal-date-input").value = "";
+  
   await loadGoalsPage(true);
   renderOverviewPage();
+}
+
+async function createBudget() {
+  const name = document.getElementById("budget-name-input")?.value?.trim();
+  const limit = document.getElementById("budget-limit-input")?.value;
+  const alertThreshold = document.getElementById("budget-alert-input")?.value || "80";
+  const startDate = document.getElementById("budget-date-input")?.value;
+  const accountId = document.getElementById("budget-account-input")?.value || APP_STATE.accounts[0]?.id;
+
+  if (!name || !limit) {
+    showFailure("Please enter a budget category and monthly limit.");
+    return;
+  }
+
+  const response = await apiRequest("/budgets", {
+    method: "POST",
+    body: {
+      name,
+      categoryName: name,
+      limit: Number(limit),
+      amount: Number(limit),
+      totalAmount: Number(limit),
+      alertThreshold: Number(alertThreshold),
+      startDate: startDate || null,
+      accountId: accountId ? Number(accountId) : null,
+      type: "MONTHLY",
+      color: "#FF6B6B",
+    },
+  });
+
+  if (!response?.id) {
+    showFailure("Budget creation failed.");
+    return;
+  }
+
+  showToast("Budget created successfully.", "success");
+  
+  // Show success feedback
+  const feedback = document.getElementById("budget-success-feedback");
+  if (feedback) {
+    feedback.style.display = "block";
+    setTimeout(() => {
+      feedback.style.display = "none";
+    }, 3000);
+  }
+  
+  // Clear form
+  document.getElementById("budget-name-input").value = "";
+  document.getElementById("budget-limit-input").value = "";
+  document.getElementById("budget-alert-input").value = "80";
+  document.getElementById("budget-date-input").value = "";
+  
+  await loadBudgetsPage();
 }
 
 async function contributeToGoal(goalId) {
